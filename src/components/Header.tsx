@@ -3,11 +3,13 @@ import { ArrowLeft } from 'lucide-react'
 import Logo from './Logo'
 import Button from './Button'
 import { SITE } from '../config/site'
+import { useAuth } from '../auth/AuthContext'
 
 const navLink =
   'text-[15px] font-medium text-on-dark transition-colors duration-150 hover:text-white'
 
 export default function Header({ variant = 'landing' }: { variant?: 'landing' | 'page' }) {
+  const { user } = useAuth()
   return (
     <header className="sticky top-0 z-40 bg-graphite">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 md:px-8">
@@ -21,10 +23,13 @@ export default function Header({ variant = 'landing' }: { variant?: 'landing' | 
               <a href="#categorias" className={navLink}>Categorias</a>
               <a href="#como-funciona" className={navLink}>Como funciona</a>
               <a href="#abertura" className={navLink}>Abertura</a>
+              {!user && <Link to="/entrar" className={navLink}>Entrar</Link>}
             </nav>
-            <Button to={SITE.signupPath} size="sm">
-              Cadastrar
-            </Button>
+            {user ? (
+              <Button to="/conta" size="sm">Minha conta</Button>
+            ) : (
+              <Button to={SITE.signupPath} size="sm">Cadastrar</Button>
+            )}
           </div>
         ) : (
           <Link

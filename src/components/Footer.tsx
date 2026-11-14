@@ -46,6 +46,9 @@ export default function Footer() {
               <InstagramIcon />
               {SITE.instagramHandle}
             </a>
+            <Link to="/entrar" className={link}>
+              Entrar
+            </Link>
             <Link to={SITE.privacyPath} className={link}>
               Política de Privacidade
             </Link>

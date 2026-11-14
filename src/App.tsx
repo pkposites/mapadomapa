@@ -1,6 +1,13 @@
 import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Landing from './pages/Landing'
+import Entrar from './pages/Entrar'
+import RecuperarSenha from './pages/RecuperarSenha'
+import Conta from './pages/Conta'
+import Admin from './pages/Admin'
+import DevSmsPanel from './components/DevSmsPanel'
+import { AuthProvider } from './auth/AuthContext'
+import { RequireAuth } from './auth/guards'
 import Cadastro from './pages/Cadastro'
 import Privacidade from './pages/Privacidade'
 import Termos from './pages/Termos'
@@ -18,15 +25,20 @@ function ScrollManager() {
 
 export default function App() {
   return (
-    <>
+    <AuthProvider>
       <ScrollManager />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path={SITE.signupPath} element={<Cadastro />} />
         <Route path={SITE.privacyPath} element={<Privacidade />} />
         <Route path={SITE.termsPath} element={<Termos />} />
+        <Route path="/entrar" element={<Entrar />} />
+        <Route path="/recuperar-senha" element={<RecuperarSenha />} />
+        <Route path="/conta" element={<RequireAuth><Conta /></RequireAuth>} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+      {import.meta.env.DEV && <DevSmsPanel />}
+    </AuthProvider>
   )
 }
