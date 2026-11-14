@@ -139,7 +139,10 @@ export async function setProfessions(userId: string, body: Record<string, unknow
       await c.query('DELETE FROM assessment_answers WHERE user_id = $1 AND profession_id <> ALL($2::smallint[])', [userId, keep])
       await c.query('DELETE FROM technical_assessments WHERE user_id = $1 AND profession_id <> ALL($2::smallint[])', [userId, keep])
       await c.query('DELETE FROM profile_professions WHERE user_id = $1 AND profession_id <> ALL($2::smallint[])', [userId, keep])
-      for (const v of valid) await c.query('INSERT INTO profile_professions (user_id, profession_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, v.id])
+      // Insere só o que é NOVO: o gatilho do banco conta a linha antes do ON CONFLICT, então reenviar a
+      // mesma seleção (voltar ao passo e continuar) não pode tentar inserir de novo.
+      const have = new Set((await c.query<{ profession_id: number }>('SELECT profession_id FROM profile_professions WHERE user_id = $1', [userId])).rows.map((r) => r.profession_id))
+      for (const v of valid) if (!have.has(v.id)) await c.query('INSERT INTO profile_professions (user_id, profession_id) VALUES ($1, $2)', [userId, v.id])
     })
   } catch (e) {
     if (isCheckViolation(e)) throw bad('too_many_professions', 'Você pode escolher no máximo 2 profissões.')
@@ -162,7 +165,8 @@ export async function setRegions(userId: string, body: Record<string, unknown>) 
     await withTransaction(async (c) => {
       await c.query('SELECT 1 FROM profiles WHERE user_id = $1 FOR UPDATE', [userId])
       await c.query('DELETE FROM professional_regions WHERE user_id = $1 AND region_id <> ALL($2::smallint[])', [userId, valid.map((v) => v.id)])
-      for (const v of valid) await c.query('INSERT INTO professional_regions (user_id, region_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, v.id])
+      const have = new Set((await c.query<{ region_id: number }>('SELECT region_id FROM professional_regions WHERE user_id = $1', [userId])).rows.map((r) => r.region_id))
+      for (const v of valid) if (!have.has(v.id)) await c.query('INSERT INTO professional_regions (user_id, region_id) VALUES ($1, $2)', [userId, v.id])
     })
   } catch (e) {
     if (isCheckViolation(e)) throw bad('too_many_regions', 'Você pode escolher no máximo 2 regiões.')

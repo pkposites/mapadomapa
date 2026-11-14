@@ -5,6 +5,7 @@ import Entrar from './pages/Entrar'
 import Conta from './pages/Conta'
 import Admin from './pages/Admin'
 import Profissional from './pages/Profissional'
+import AdminProfissional from './pages/AdminProfissional'
 import DevSmsPanel from './components/DevSmsPanel'
 import ConsentBanner from './components/ConsentBanner'
 import MetaRouteTracker from './components/MetaRouteTracker'
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/conta" element={<RequireAuth><Conta /></RequireAuth>} />
         <Route path="/profissional" element={<RequireAuth><Profissional /></RequireAuth>} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/profissionais/:id" element={<AdminProfissional />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <ConsentBanner />

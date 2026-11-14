@@ -12,6 +12,7 @@ import {
 import { parseBrazilMobile } from './lib/phone'
 import { loadSession, requireAdmin, requireUser, revokeSession } from './lib/sessions'
 import * as pro from './pro/service'
+import * as adm from './admin/service'
 import * as auth from './services/auth'
 
 export type ApiContext = { ip?: string }
@@ -125,6 +126,20 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   }
 
   // ---------- Administração (apenas a base: guarda de permissão; painel vem depois) ----------
+  if (path.startsWith('/admin/') && path !== '/admin/ping') {
+    const admin = requireAdmin(await loadSession(token))
+    const m = path.match(/^\/admin\/professionals\/([0-9a-f-]{36})(\/decision|\/phone)?$/)
+    if (method === 'GET' && path === '/admin/stats') return json(await adm.stats())
+    if (method === 'GET' && path === '/admin/professionals') return json(await adm.list({ status: url.searchParams.get('status'), q: url.searchParams.get('q'), page: url.searchParams.get('page') }))
+    if (m && method === 'GET' && !m[2]) return json(await adm.detail(admin.userId, m[1], ctx.ip))
+    if (m && method === 'POST' && m[2] === '/decision') return json(await adm.decide(admin.userId, m[1], await readJson(req), ctx.ip))
+    if (m && method === 'POST' && m[2] === '/phone') return json(await adm.setPhoneVerified(admin.userId, m[1], (await readJson(req)).verified === true, ctx.ip))
+  }
+  if (method === 'GET' && path === '/public/professionals') {
+    await enforce(`public:list:${ctx.ip ?? 'unknown'}`, 120, 3600)
+    return json(await adm.publicProfessionals())
+  }
+
   if (method === 'GET' && path === '/admin/ping') {
     const admin = requireAdmin(await loadSession(token))
     await audit('admin.access', { userId: admin.userId, ip: ctx.ip, details: { path } })

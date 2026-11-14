@@ -451,7 +451,8 @@ describe('8. Administração (apenas a base de permissões)', () => {
   it('nenhuma conta nasce admin e não há rota para virar admin', async () => {
     const cookie = await signup()
     expect((await api('GET', '/auth/me', { cookie })).body.user.isAdmin).toBe(false)
-    expect((await api('POST', '/admin/grant', { body: { phone: PHONE }, cookie })).status).toBe(404)
+    // Não existe rota para virar admin: usuário comum é barrado pela guarda (403); admin recebe 404.
+    expect((await api('POST', '/admin/grant', { body: { phone: PHONE }, cookie })).status).toBe(403)
     expect((await query("SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.name = 'admin'")).length).toBe(0)
   })
 })

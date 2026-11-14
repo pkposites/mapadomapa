@@ -1,85 +1,100 @@
-import { useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { Lock, ShieldCheck } from 'lucide-react'
-import AuthShell from '../components/AuthShell'
+import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { AlertTriangle, ChevronRight, ShieldAlert, Search } from 'lucide-react'
+import Header from '../components/Header'
+import Footer from '../components/Footer'
 import Alert from '../components/ui/Alert'
 import Spinner from '../components/ui/Spinner'
 import SubmitButton from '../components/ui/SubmitButton'
-import Button from '../components/Button'
-import { useAuth } from '../auth/AuthContext'
+import AdminGate from '../admin/AdminGate'
+import StatusBadge from '../admin/StatusBadge'
+import { STATUS_LABEL, type Item, type Stats, type Status } from '../admin/types'
 import { api, ApiError } from '../lib/api'
 
-/**
- * Base da área administrativa. A tela só aparece se o SERVIDOR confirmar a permissão
- * (/api/admin/ping). O painel completo será construído em uma etapa futura.
- */
+const ORDER: Status[] = ['pending_review', 'approved', 'needs_changes', 'rejected', 'suspended', 'not_submitted']
+
+/** Painel administrativo: resumo por situação + lista de profissionais. */
 export default function Admin() {
-  const { user, loading, logout } = useAuth()
-  const navigate = useNavigate()
-  const [state, setState] = useState<'checking' | 'ok' | 'forbidden' | 'reauth' | 'error'>('checking')
+  return <AdminGate><Panel /></AdminGate>
+}
 
-  useEffect(() => {
-    if (!user) return
-    api
-      .get('/admin/ping')
-      .then(() => setState('ok'))
-      .catch((err: unknown) => {
-        if (err instanceof ApiError && err.code === 'admin_reauth_required') setState('reauth')
-        else if (err instanceof ApiError && (err.status === 403 || err.status === 401)) setState('forbidden')
-        else setState('error')
-      })
-  }, [user])
+function Panel() {
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [status, setStatus] = useState<Status | ''>('pending_review')
+  const [q, setQ] = useState('')
+  const [items, setItems] = useState<Item[]>([])
+  const [page, setPage] = useState(1)
+  const [more, setMore] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
 
-  if (loading) return <Spinner fullPage />
-  if (!user) return <Navigate to="/entrar" replace state={{ from: '/admin' }} />
+  const load = useCallback(async (reset: boolean, p = 1) => {
+    setBusy(true); setErr(null)
+    try {
+      const r = await api.get<{ items: Item[]; page: number; hasMore: boolean }>(`/admin/professionals?status=${status}&q=${encodeURIComponent(q)}&page=${p}`)
+      setItems((cur) => (reset ? r.items : [...cur, ...r.items])); setPage(r.page); setMore(r.hasMore)
+    } catch (e) { setErr(e instanceof ApiError ? e.message : 'Não foi possível carregar a lista.') } finally { setBusy(false) }
+  }, [status, q])
 
-  if (state === 'checking') return <Spinner fullPage />
-
-  if (state === 'forbidden') {
-    return (
-      <AuthShell eyebrow="Acesso restrito" title="Você não tem permissão para ver esta página">
-        <div className="space-y-5">
-          <p className="flex items-center gap-3 text-[16px] text-muted">
-            <Lock size={22} strokeWidth={1.75} aria-hidden="true" /> Esta área é apenas para administradores.
-          </p>
-          <Button to="/conta" variant="dark" fullWidth>Voltar para minha conta</Button>
-        </div>
-      </AuthShell>
-    )
-  }
-
-  if (state === 'reauth') {
-    return (
-      <AuthShell eyebrow="Segurança" title="Entre novamente para continuar">
-        <div className="space-y-5">
-          <Alert tone="info">Por segurança, a área administrativa pede um novo login a cada 8 horas.</Alert>
-          <SubmitButton onClick={async () => { await logout().catch(() => undefined); navigate('/entrar', { state: { from: '/admin' } }) }}>
-            Entrar de novo
-          </SubmitButton>
-        </div>
-      </AuthShell>
-    )
-  }
-
-  if (state === 'error') {
-    return (
-      <AuthShell eyebrow="Administração" title="Não foi possível carregar">
-        <Alert tone="error">Algo deu errado. Tente de novo em instantes.</Alert>
-      </AuthShell>
-    )
-  }
+  useEffect(() => { api.get<Stats>('/admin/stats').then(setStats).catch(() => undefined) }, [])
+  useEffect(() => { const t = setTimeout(() => void load(true), q ? 350 : 0); return () => clearTimeout(t) }, [load, q])
 
   return (
-    <AuthShell eyebrow="Administração" title="Área administrativa" subtitle="O painel completo está em preparação.">
-      <div className="space-y-4">
-        <p className="flex items-center gap-3 text-[16px]">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-lime text-graphite">
-            <ShieldCheck size={22} strokeWidth={2} aria-hidden="true" />
-          </span>
-          Permissão de administrador confirmada.
-        </p>
-        <Link to="/conta" className="block text-[15px] font-semibold underline underline-offset-4">Voltar para minha conta</Link>
-      </div>
-    </AuthShell>
+    <>
+      <Header variant="page" />
+      <main className="bg-ice">
+        <div className="mx-auto max-w-2xl px-5 pb-10 pt-6 md:pt-10">
+          <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Administração</p>
+          <h1 className="mt-2 text-[30px] font-bold leading-tight tracking-[-0.02em]">Profissionais</h1>
+          <p className="mt-1 text-[15px] text-muted">Nenhum profissional aparece ao público sem a sua aprovação.</p>
+
+          <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-3" role="group" aria-label="Filtrar por situação">
+            {ORDER.map((s) => (
+              <button key={s} type="button" aria-pressed={status === s} onClick={() => setStatus(status === s ? '' : s)}
+                className={`min-h-16 rounded-2xl border p-3 text-left transition duration-150 active:scale-[0.98] ${status === s ? 'border-graphite bg-graphite text-white' : 'border-line bg-white'}`}>
+                <span className="block text-[24px] font-bold leading-none">{stats?.byStatus[s] ?? '–'}</span>
+                <span className={`mt-1 block text-[13px] ${status === s ? 'text-on-dark' : 'text-muted'}`}>{STATUS_LABEL[s]}</span>
+              </button>
+            ))}
+          </div>
+          {stats && stats.unverifiedPhones > 0 && <p className="mt-3 flex items-center gap-2 text-[14px] text-muted"><ShieldAlert size={18} aria-hidden="true" /> {stats.unverifiedPhones} celular(es) ainda não verificado(s).</p>}
+
+          <label htmlFor="q" className="mt-5 block text-[15px] font-semibold">Buscar por celular</label>
+          <div className="relative mt-2">
+            <Search size={20} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+            <input id="q" inputMode="tel" placeholder="Ex.: 91234" value={q} onChange={(e) => setQ(e.target.value)}
+              className="min-h-13 w-full rounded-2xl border border-line bg-white pl-12 pr-4 text-[17px] focus:outline-2 focus:outline-offset-2 focus:outline-graphite" />
+          </div>
+
+          {err && <div className="mt-4"><Alert tone="error">{err}</Alert></div>}
+          <ul className="mt-5 space-y-3">
+            {items.map((i) => (
+              <li key={i.id}>
+                <Link to={`/admin/profissionais/${i.id}`} className="block rounded-2xl bg-white p-4 transition duration-150 active:scale-[0.99]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[17px] font-semibold">{i.phone}</p>
+                      <p className="mt-0.5 text-[14px] text-muted">{i.professions.join(' · ') || 'Sem profissão escolhida'}</p>
+                      <p className="text-[14px] text-muted">{i.regions.join(' · ') || 'Sem região'}</p>
+                    </div>
+                    <ChevronRight size={22} className="mt-1 shrink-0 text-muted" aria-hidden="true" />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <StatusBadge status={i.reviewStatus} />
+                    {!i.phoneVerified && <span className="inline-flex min-h-7 items-center rounded-full border border-line px-3 text-[13px] text-muted">Celular não verificado</span>}
+                    {i.bestScore !== null && <span className="text-[13px] font-semibold">Nota técnica {i.bestScore}</span>}
+                    {i.flagged > 0 && <span className="flex items-center gap-1 text-[13px] font-semibold text-danger"><AlertTriangle size={14} aria-hidden="true" /> {i.flagged} alerta(s)</span>}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {busy && <div className="mt-6 flex justify-center"><Spinner /></div>}
+          {!busy && items.length === 0 && !err && <p className="mt-8 text-center text-[16px] text-muted">Nenhum cadastro nesta situação.</p>}
+          {more && <div className="mt-4"><SubmitButton variant="ghost" className="border border-line" onClick={() => void load(false, page + 1)}>Carregar mais</SubmitButton></div>}
+        </div>
+      </main>
+      <Footer />
+    </>
   )
 }
