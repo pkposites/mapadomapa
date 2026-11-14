@@ -1,4 +1,5 @@
 import { audit } from '../lib/audit'
+import { enforce } from '../lib/rateLimit'
 import { now } from '../lib/clock'
 import { query, withTransaction } from '../lib/db'
 import { ApiError } from '../lib/http'
@@ -88,7 +89,7 @@ export async function detail(adminId: string, userId: string, ip?: string) {
 
   return {
     id: u.id as string, fullName: (pr?.full_name ?? null) as string | null, bio: (pr?.bio ?? null) as string | null, services: (pr?.services ?? null) as string | null,
-    extraInfo: (pr?.extra_info ?? null) as string | null, hasPhoto, unreadMessages: unread,
+    extraInfo: (pr?.extra_info ?? null) as string | null, hasPhoto, unreadMessages: unread, welcomeSent: (await query('SELECT 1 FROM messages WHERE user_id = $1 AND kind = \'welcome\'', [userId])).length > 0,
     profileEvents: pevents.map((e) => ({ kind: e.kind as string, details: e.details as string | null, at: e.created_at })),
     phone: formatNational(u.e164), phoneVerified: Boolean(u.verified_at), phoneVerifiedAt: u.verified_at,
     accountStatus: u.status as string, createdAt: u.created_at, lastLoginAt: u.last_login_at,
@@ -213,4 +214,67 @@ export async function setAnnouncementPublished(adminId: string, id: string, publ
   if (!r.length) throw new ApiError(404, 'not_found', 'Comunicado não encontrado.')
   await audit('admin.announcement_visibility', { userId: adminId, details: { id, published } })
   return adminAnnouncements()
+}
+
+// ---------- Boas-vindas (somente pela caixa de mensagens interna; no máximo 1 por profissional) ----------
+export const WELCOME_TEMPLATE = `Olá, [nome]! 👋
+
+Seja bem-vindo ao Mapa do Mapa!
+
+Estamos preparando tudo para o início dos pedidos de orçamento, previsto para 25/11/2026.
+
+Enquanto isso, complete seu perfil e acompanhe os comunicados por aqui.
+
+Qualquer dúvida, pode conversar com nossa equipe nesta área.
+
+Equipe Mapa do Mapa 💚`
+
+/** [nome] vira o primeiro nome; sem nome cadastrado, o trecho some ("Olá, [nome]!" → "Olá!"). */
+export function personalize(template: string, fullName: string | null): string {
+  const first = fullName?.trim().split(/\s+/)[0]
+  return (first ? template.replace(/\[nome\]/gi, first) : template.replace(/,\s*\[nome\]/gi, '').replace(/\[nome\]/gi, '')).trim()
+}
+const welcomeBody = (v: unknown): string => {
+  const t = typeof v === 'string' ? v.trim() : ''
+  if (t.length < 10 || t.length > 900) throw bad('invalid_body', 'A mensagem precisa ter de 10 a 900 caracteres.')
+  return t
+}
+const ELIGIBLE = `u.status = 'active' AND NOT EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id AND r.name = 'admin')`
+
+export async function welcomeInfo() {
+  const [{ total, pending }] = await query<Row>(
+    `SELECT count(*)::int AS total, count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.user_id = u.id AND m.kind = 'welcome'))::int AS pending FROM users u WHERE ${ELIGIBLE}`)
+  return { template: WELCOME_TEMPLATE, total: total as number, pending: pending as number }
+}
+
+export async function sendWelcome(adminId: string, userId: string, body: unknown) {
+  const text = welcomeBody(body)
+  const u = (await query<Row>(`SELECT u.id, pr.full_name FROM users u LEFT JOIN professional_profiles pr ON pr.user_id = u.id WHERE u.id = $1 AND ${ELIGIBLE}`, [userId]))[0]
+  if (!u) throw new ApiError(404, 'not_found', 'Profissional não encontrado.')
+  const r = await query<Row>(
+    `INSERT INTO messages (user_id, sender, sender_user_id, kind, body) VALUES ($1,'admin',$2,'welcome',$3) ON CONFLICT (user_id) WHERE kind = 'welcome' DO NOTHING RETURNING id`,
+    [userId, adminId, personalize(text, u.full_name).slice(0, 1000)])
+  if (r.length === 0) throw new ApiError(409, 'welcome_already_sent', 'As boas-vindas já foram enviadas para este profissional.')
+  await audit('admin.welcome', { userId: adminId, details: { target: userId } })
+  return { ok: true, sent: 1 }
+}
+
+export async function sendWelcomeAll(adminId: string, body: unknown) {
+  const text = welcomeBody(body)
+  await enforce(`welcome:all:${adminId}`, 3, 600) // trava cliques/reenvios repetidos
+  const rows = await query<Row>(
+    `SELECT u.id, pr.full_name FROM users u LEFT JOIN professional_profiles pr ON pr.user_id = u.id
+     WHERE ${ELIGIBLE} AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.user_id = u.id AND m.kind = 'welcome')`)
+  let sent = 0
+  await withTransaction(async (c) => {
+    for (const r of rows) {
+      const ins = await c.query(
+        `INSERT INTO messages (user_id, sender, sender_user_id, kind, body) VALUES ($1,'admin',$2,'welcome',$3) ON CONFLICT (user_id) WHERE kind = 'welcome' DO NOTHING RETURNING id`,
+        [r.id, adminId, personalize(text, r.full_name).slice(0, 1000)])
+      sent += ins.rows.length
+    }
+  })
+  const info = await welcomeInfo()
+  await audit('admin.welcome_all', { userId: adminId, details: { sent } })
+  return { ok: true, sent, alreadyHad: info.total - sent, total: info.total }
 }

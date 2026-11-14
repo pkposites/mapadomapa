@@ -10,6 +10,7 @@ import AdminGate from '../admin/AdminGate'
 import StatusBadge from '../admin/StatusBadge'
 import type { Detail, Status } from '../admin/types'
 import { Thread } from './area/Mensagens'
+import WelcomeBox from '../admin/WelcomeBox'
 import type { Msg } from '../area/types'
 import { api, ApiError } from '../lib/api'
 
@@ -27,6 +28,18 @@ const FOR_STATUS: Partial<Record<Status, Action[]>> = {
 const DAY: Record<string, string> = { seg: 'Seg', ter: 'Ter', qua: 'Qua', qui: 'Qui', sex: 'Sex', sab: 'Sáb', dom: 'Dom' }
 const PERIOD: Record<string, string> = { manha: 'manhã', tarde: 'tarde', noite: 'noite' }
 const ACTION_LABEL: Record<string, string> = { approve: 'Aprovado', reject: 'Rejeitado', request_changes: 'Ajustes pedidos', suspend: 'Suspenso', reinstate: 'Reativado', verify_phone: 'Celular verificado', unverify_phone: 'Verificação do celular removida' }
+const WELCOME_DEFAULT = `Olá, [nome]! 👋
+
+Seja bem-vindo ao Mapa do Mapa!
+
+Estamos preparando tudo para o início dos pedidos de orçamento, previsto para 25/11/2026.
+
+Enquanto isso, complete seu perfil e acompanhe os comunicados por aqui.
+
+Qualquer dúvida, pode conversar com nossa equipe nesta área.
+
+Equipe Mapa do Mapa 💚`
+const firstNamed = (t: string, full: string | null) => { const f = full?.trim().split(/\s+/)[0]; return f ? t.replace(/\[nome\]/gi, f) : t.replace(/,\s*\[nome\]/gi, '').replace(/\[nome\]/gi, '') }
 const fmt = (d: string) => new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 
 export default function AdminProfissional() {
@@ -82,6 +95,14 @@ function Page() {
           <div className="mt-4 rounded-2xl bg-ice p-3"><p className="text-[14px] font-semibold">Alterações feitas pelo profissional</p>
             <ul className="mt-1 space-y-1 text-[14px]">{d.profileEvents.map((e, i) => <li key={i}>{fmt(e.at)} · {e.details ?? e.kind}</li>)}</ul></div>
         )}
+      </Block>
+
+      <Block title="Boas-vindas">
+        <WelcomeBox openLabel="Enviar boas-vindas" template={WELCOME_DEFAULT}
+          disabledReason={d.welcomeSent ? 'As boas-vindas já foram enviadas para este profissional.' : null}
+          confirmText={`Enviar boas-vindas para ${d.fullName?.split(/\s+/)[0] ?? 'este profissional'}?`}
+          preview={(b) => firstNamed(b, d.fullName)}
+          send={async (body) => { await api.post(`/admin/professionals/${d.id}/welcome`, { body }); await load(); return 'Boas-vindas enviadas.' }} />
       </Block>
 
       <Block title={`Mensagens${d.unreadMessages ? ` (${d.unreadMessages} não lida(s))` : ''}`}>

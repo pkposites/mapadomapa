@@ -8,7 +8,7 @@ export type Item = {
   professions: string[]; regions: string[]; bestScore: number | null; flagged: number
 }
 export type Detail = {
-  fullName: string | null; bio: string | null; services: string | null; extraInfo: string | null; hasPhoto: boolean; unreadMessages: number
+  fullName: string | null; bio: string | null; services: string | null; extraInfo: string | null; hasPhoto: boolean; unreadMessages: number; welcomeSent: boolean
   profileEvents: { kind: string; details: string | null; at: string }[]
   id: string; phone: string; phoneVerified: boolean; accountStatus: string; createdAt: string; reviewStatus: Status; submittedAt: string | null; reviewNotes: string | null
   work: { availability: { weekdays: string[]; periods: string[]; emergency: boolean } | null; ownTools: string | null; vehicle: string | null; workStructure: string | null } | null

@@ -142,3 +142,26 @@ describe('Mensagens e comunicados', () => {
     expect((await u.call('GET', '/pro/announcements')).body.items.map((a: any) => a.title)).not.toContain('Novidade')
   })
 })
+
+describe('Boas-vindas (administração)', () => {
+  it('só admin; individual personaliza e não duplica; coletivo pula quem já recebeu; resultado informado', async () => {
+    const admin = await mkAdmin(), a = await mkUser(), b = await mkUser(), c = await mkUser()
+    await a.call('PUT', '/pro/me', { fullName: 'Ana Souza' })
+    const tpl = 'Olá, [nome]! Seja bem-vindo ao Mapa do Mapa!'
+    expect((await a.call('POST', `/admin/professionals/${b.id}/welcome`, { body: tpl })).status).toBe(403)
+    expect((await a.call('POST', '/admin/welcome-all', { body: tpl })).status).toBe(403)
+    expect((await api('POST', `/admin/professionals/${a.id}/welcome`, { cookie: admin.cookie, body: { body: 'curta' } })).status).toBe(400)
+    expect((await api('POST', `/admin/professionals/${a.id}/welcome`, { cookie: admin.cookie, body: { body: tpl } })).status).toBe(200)
+    expect((await a.call('GET', '/pro/messages')).body.messages[0]).toMatchObject({ kind: 'welcome', body: 'Olá, Ana! Seja bem-vindo ao Mapa do Mapa!' })
+    const again = await api('POST', `/admin/professionals/${a.id}/welcome`, { cookie: admin.cookie, body: { body: tpl } })
+    expect(again.status).toBe(409); expect(again.body.error.code).toBe('welcome_already_sent')
+    expect((await api('GET', '/admin/welcome', { cookie: admin.cookie })).body).toMatchObject({ total: 3, pending: 2 })
+    const all = await api('POST', '/admin/welcome-all', { cookie: admin.cookie, body: { body: tpl } })
+    expect(all.body).toMatchObject({ sent: 2, alreadyHad: 1, total: 3 }) // admin fora da conta
+    expect((await b.call('GET', '/pro/messages')).body.messages[0].body).toBe('Olá! Seja bem-vindo ao Mapa do Mapa!') // sem nome: sem ", [nome]"
+    expect((await api('POST', '/admin/welcome-all', { cookie: admin.cookie, body: { body: tpl } })).body).toMatchObject({ sent: 0 })
+    expect((await query<any>("SELECT count(*)::int n FROM messages WHERE kind = 'welcome'"))[0].n).toBe(3)
+    expect((await c.call('GET', '/pro/messages/unread')).body.unread).toBe(1)
+    expect((await query<any>("SELECT 1 FROM messages WHERE kind='welcome' AND user_id = $1", [admin.id])).length).toBe(0) // admin não recebe
+  })
+})

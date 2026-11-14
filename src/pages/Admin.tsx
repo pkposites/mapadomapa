@@ -7,6 +7,7 @@ import Alert from '../components/ui/Alert'
 import Spinner from '../components/ui/Spinner'
 import SubmitButton from '../components/ui/SubmitButton'
 import AdminGate from '../admin/AdminGate'
+import WelcomeBox from '../admin/WelcomeBox'
 import StatusBadge from '../admin/StatusBadge'
 import { STATUS_LABEL, type Item, type Stats, type Status } from '../admin/types'
 import { api, ApiError } from '../lib/api'
@@ -36,7 +37,8 @@ function Panel() {
     } catch (e) { setErr(e instanceof ApiError ? e.message : 'Não foi possível carregar a lista.') } finally { setBusy(false) }
   }, [status, q])
 
-  useEffect(() => { api.get<Stats>('/admin/stats').then(setStats).catch(() => undefined) }, [])
+  const [welcome, setWelcome] = useState<{ template: string; total: number; pending: number } | null>(null)
+  useEffect(() => { api.get<Stats>('/admin/stats').then(setStats).catch(() => undefined); api.get<{ template: string; total: number; pending: number }>('/admin/welcome').then(setWelcome).catch(() => undefined) }, [])
   useEffect(() => { const t = setTimeout(() => void load(true), q ? 350 : 0); return () => clearTimeout(t) }, [load, q])
 
   return (
@@ -52,6 +54,17 @@ function Panel() {
             <Link to="/admin/mensagens" className="flex min-h-14 items-center gap-2 rounded-2xl bg-graphite px-4 font-semibold text-white"><MessageSquare size={18} aria-hidden="true" /> Mensagens{stats && stats.unreadMessages > 0 && <span className="ml-auto rounded-full bg-lime px-2 text-[13px] text-graphite">{stats.unreadMessages}</span>}</Link>
             <Link to="/admin/comunicados" className="flex min-h-14 items-center gap-2 rounded-2xl bg-white px-4 font-semibold"><Megaphone size={18} aria-hidden="true" /> Comunicados</Link>
           </div>
+
+          {welcome && (
+            <section className="mt-4 rounded-2xl bg-white p-4" aria-label="Boas-vindas coletivas">
+              <p className="text-[15px] font-semibold">Boas-vindas para todos</p>
+              <p className="mb-3 mt-1 text-[14px] text-muted">{welcome.pending} de {welcome.total} profissional(is) ainda não receberam as boas-vindas.</p>
+              <WelcomeBox openLabel="Enviar boas-vindas para todos" template={welcome.template}
+                disabledReason={welcome.pending === 0 ? 'Todos os profissionais já receberam as boas-vindas.' : null}
+                confirmText={`Enviar para ${welcome.pending} profissional(is)? Quem já recebeu não receberá de novo.`}
+                send={async (body) => { const r = await api.post<{ sent: number; alreadyHad: number }>('/admin/welcome-all', { body }); setWelcome(await api.get('/admin/welcome')); return `Enviadas: ${r.sent}. Já tinham recebido antes: ${r.alreadyHad}.` }} />
+            </section>
+          )}
 
           <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-3" role="group" aria-label="Filtrar por situação">
             {ORDER.map((s) => (

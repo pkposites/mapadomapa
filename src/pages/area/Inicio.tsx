@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, ChevronDown, ClipboardList, MessageSquare, ShieldCheck, UserRound } from 'lucide-react'
 import AreaShell from '../../area/Shell'
 import InstallPrompt from '../../area/InstallPrompt'
+import ShareCard from '../../area/ShareCard'
 import Spinner from '../../components/ui/Spinner'
 import Alert from '../../components/ui/Alert'
 import { api } from '../../lib/api'
 import { useAuth } from '../../auth/AuthContext'
-import { STATUS_HINT, STATUS_TONE, type Announcement, type Home } from '../../area/types'
+import { NEXT_STEPS, STATUS_HINT, STATUS_TONE, type Announcement, type Home } from '../../area/types'
 
 const fmt = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
 
@@ -40,6 +41,8 @@ export default function Inicio() {
             <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Status do cadastro</p>
             <p className={`mt-2 inline-block rounded-full px-3.5 py-1.5 text-[15px] font-semibold ${STATUS_TONE[h.status] ?? 'bg-ice'}`} data-testid="status-badge">{h.statusLabel}</p>
             <p className="mt-3 text-[15px] leading-snug text-muted">{STATUS_HINT[h.status]}</p>
+            <p className="mt-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Próximos passos</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-[15px] leading-snug" data-testid="next-steps">{(NEXT_STEPS[h.status] ?? []).map((t) => <li key={t}>{t}</li>)}</ol>
             {h.decision?.notes && (
               <div className="mt-3 rounded-2xl bg-ice p-4 text-[15px] leading-snug"><p className="font-semibold">Orientação da equipe</p><p className="mt-1">{h.decision.notes}</p></div>
             )}
@@ -49,21 +52,25 @@ export default function Inicio() {
             <Link to="/admin" className="flex min-h-14 items-center gap-3 rounded-2xl bg-graphite px-5 font-semibold text-white"><ShieldCheck size={20} aria-hidden="true" /> Painel administrativo <ArrowRight size={18} className="ml-auto" aria-hidden="true" /></Link>
           )}
 
-          {h.pendencies.length > 0 && (
-            <section className="rounded-3xl bg-white p-5" aria-label="Pendências">
-              <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Pendências</p>
-              <ul className="mt-3 divide-y divide-line">
-                {h.pendencies.map((p) => (
-                  <li key={p.id}>
-                    <Link to={p.to} className="flex min-h-14 items-center gap-3 py-2 text-[15px] leading-snug">
-                      <span className={`size-2.5 shrink-0 rounded-full ${p.required ? 'bg-danger' : 'bg-line'}`} aria-hidden="true" />
-                      <span className="flex-1">{p.text}</span><ArrowRight size={18} className="text-muted" aria-hidden="true" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          {(['required', 'optional'] as const).map((kind) => {
+            const list = h.pendencies.filter((p) => (kind === 'required') === p.required)
+            if (list.length === 0) return null
+            return (
+              <section key={kind} className="rounded-3xl bg-white p-5" aria-label={kind === 'required' ? 'Pendências obrigatórias' : 'Sugestões'} data-testid={`pend-${kind}`}>
+                <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">{kind === 'required' ? 'Pendências obrigatórias' : 'Sugestões para melhorar seu perfil'}</p>
+                <ul className="mt-3 divide-y divide-line">
+                  {list.map((p) => (
+                    <li key={p.id}>
+                      <Link to={p.to} className="flex min-h-14 items-center gap-3 py-2 text-[15px] leading-snug">
+                        <span className={`size-2.5 shrink-0 rounded-full ${kind === 'required' ? 'bg-danger' : 'bg-lime ring-1 ring-graphite/20'}`} aria-hidden="true" />
+                        <span className="flex-1">{p.text}</span><ArrowRight size={18} className="text-muted" aria-hidden="true" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          })}
 
           <div className="grid grid-cols-3 gap-3">
             {[
@@ -93,6 +100,17 @@ export default function Inicio() {
             </button>
           </section>
 
+          <details className="rounded-3xl bg-white p-5" data-testid="how-it-works">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-[16px] font-bold [&::-webkit-details-marker]:hidden">Como funciona a plataforma <ChevronDown size={18} aria-hidden="true" /></summary>
+            <ol className="mt-3 list-decimal space-y-2 pl-5 text-[15px] leading-snug text-muted">
+              <li>Você faz o pré-cadastro e responde às perguntas rápidas.</li>
+              <li>Nossa equipe analisa e aprova cada perfil. Nada é automático.</li>
+              <li>Os pedidos de orçamento começam em 25/11/2026. Cada pedido chegará para você e você escolhe responder ou não.</li>
+              <li>Fale com a equipe a qualquer momento em Mensagens.</li>
+            </ol>
+          </details>
+
+          <ShareCard />
           <InstallPrompt />
         </div>
       )}

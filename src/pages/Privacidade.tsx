@@ -4,35 +4,37 @@ const SECTIONS: LegalSection[] = [
   {
     title: 'Quem somos',
     body: [
-      'O Mapa do Mapa é uma plataforma, em pré-lançamento, que conectará profissionais autônomos a clientes em São Paulo.',
+      'O Mapa do Mapa é uma plataforma, em pré-lançamento, que conectará profissionais autônomos a clientes em São Paulo. O pré-cadastro de profissionais está aberto; os pedidos de orçamento estão previstos para 25/11/2026.',
     ],
     pending: 'Razão social, CNPJ, endereço e canal de contato do controlador dos dados.',
   },
   {
-    title: 'Dados nesta fase de pré-lançamento',
+    title: 'Dados que coletamos hoje',
     body: [
-      'Nesta fase, o site não possui cadastro nem formulários. Por isso, não coletamos dados pessoais por conta própria. Provedores de hospedagem podem registrar dados técnicos de acesso (como endereço IP) para segurança e funcionamento do serviço.',
+      'No pré-cadastro, coletamos: número de celular e senha (a senha é guardada de forma irreversível, nunca em texto aberto); aceite destes documentos; nome; foto e apresentação profissional (opcionais); profissões (até 2) e regiões de atendimento (até 2); experiência, disponibilidade, ferramentas, veículo e forma de trabalho; respostas do questionário técnico; e as mensagens trocadas com a equipe pela plataforma.',
+      'Não pedimos e-mail. Neste momento o celular não é confirmado por SMS: a equipe do Mapa do Mapa o marca como verificado. Também são registrados dados técnicos de acesso (como endereço IP e data/hora) para segurança e prevenção de fraudes e abusos.',
     ],
-    pending: 'Confirmar com o provedor de hospedagem quais registros técnicos são mantidos e por quanto tempo.',
+    pending: 'Confirmar a lista final de dados, o prazo em que registros técnicos são mantidos (inclusive no provedor de hospedagem) e a necessidade de dados adicionais.',
   },
   {
-    title: 'Dados que poderão ser coletados no cadastro',
+    title: 'Quem vê seus dados',
     body: [
-      'Quando o cadastro abrir, a previsão é coletar dados como nome, contato, até 2 profissões escolhidas e as regiões de São Paulo em que o profissional atende.',
+      'A equipe do Mapa do Mapa analisa cada cadastro e decide se aprova, pede ajustes, rejeita ou suspende. Nenhum perfil é exibido ao público sem aprovação da equipe. Seu celular, sua senha e suas respostas do questionário não são públicos.',
+      'Quando os pedidos de orçamento começarem, parte dos dados de profissionais aprovados poderá ser exibida a clientes interessados nos serviços.',
     ],
-    pending: 'Lista definitiva de dados, após o desenho final do cadastro (próximas etapas do produto).',
+    pending: 'Quais dados exatos serão exibidos a clientes quando os pedidos abrirem.',
   },
   {
     title: 'Finalidades e base legal',
     body: [
-      'Os dados serão usados para criar o perfil do profissional, conectá-lo a pedidos de orçamento e operar a plataforma, conforme a Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018).',
+      'Os dados são usados para analisar o cadastro, criar o perfil do profissional, conectá-lo a pedidos de orçamento (quando começarem) e operar a plataforma, conforme a Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018).',
     ],
     pending: 'Base legal de cada finalidade e eventual necessidade de consentimento específico.',
   },
   {
     title: 'Cookies e mensuração de anúncios (Meta)',
     body: [
-      'Se você permitir, usamos o Meta Pixel (no navegador) e a Conversions API (no servidor) para medir se os anúncios do Mapa do Mapa funcionam. Quando você confirma o cadastro, podemos enviar à Meta o evento "cadastro concluído" com seu telefone protegido por criptografia irreversível (hash), nunca em texto aberto.',
+      'Se você permitir, usamos o Meta Pixel (no navegador) e a Conversions API (no servidor) para medir se os anúncios do Mapa do Mapa funcionam. Quando você conclui o cadastro, podemos enviar à Meta o evento "cadastro concluído" com seu telefone protegido por criptografia irreversível (hash), nunca em texto aberto.',
       'Nada disso é ativado sem a sua autorização. Você pode recusar, mudar de ideia a qualquer momento em "Preferências de privacidade", no rodapé, e o sinal de privacidade do navegador (Global Privacy Control / Do Not Track) é respeitado.',
     ],
     pending: 'Base legal (consentimento), papéis de controlador/operador com a Meta, transferência internacional de dados, prazo de retenção e texto final de cookies.',
@@ -40,21 +42,21 @@ const SECTIONS: LegalSection[] = [
   {
     title: 'Compartilhamento',
     body: [
-      'Parte dos dados do profissional poderá ser exibida a clientes interessados em seus serviços, e operadores de tecnologia poderão tratar dados em nome da plataforma.',
+      'Usamos provedores de tecnologia (como hospedagem e banco de dados, na Netlify) que tratam dados em nome da plataforma. Não vendemos dados pessoais.',
     ],
     pending: 'Relação de operadores e terceiros (hospedagem, banco de dados, comunicação) e quais dados cada um recebe.',
   },
   {
     title: 'Direitos do titular',
     body: [
-      'A LGPD garante ao titular direitos como confirmação do tratamento, acesso, correção, anonimização, portabilidade e eliminação de dados, entre outros. O canal para exercê-los será informado aqui.',
+      'A LGPD garante ao titular direitos como confirmação do tratamento, acesso, correção, anonimização, portabilidade e eliminação de dados, entre outros. Para exercê-los, fale com a equipe pela caixa de mensagens da sua área ou pelo Instagram @mapadomapa.',
     ],
     pending: 'Canal de atendimento e nome/contato do encarregado (DPO).',
   },
   {
     title: 'Retenção e segurança',
     body: [
-      'Os dados serão mantidos pelo tempo necessário às finalidades do serviço e protegidos por medidas técnicas e administrativas adequadas.',
+      'Os dados são mantidos pelo tempo necessário às finalidades do serviço. Adotamos medidas como senhas armazenadas de forma irreversível, limites de tentativas de acesso, proteção contra cadastros automatizados e acesso administrativo restrito.',
     ],
     pending: 'Prazos de retenção e descrição das medidas de segurança adotadas.',
   },
@@ -68,7 +70,7 @@ export default function Privacidade() {
   return (
     <LegalPage
       title="Política de Privacidade"
-      intro="Explica como o Mapa do Mapa tratará dados pessoais. O conteúdo abaixo é um esboço para orientar a revisão jurídica."
+      intro="Explica como o Mapa do Mapa trata dados pessoais. Os itens marcados como “Pendente” dependem de definições da empresa e de revisão jurídica."
       sections={SECTIONS}
     />
   )
