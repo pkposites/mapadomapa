@@ -131,3 +131,13 @@ Riscos de cobrança extra: (1) **esgotar os créditos pausa TODOS os sites do ti
 4. Assim que o 1º deploy terminar: ative a **proteção por senha do site** (você escolhe a senha). Abra em janela anônima e confirme que pede senha.
 5. Só então defina `PRE_REGISTRATION_OPEN=true` e faça **novo deploy** (15 créditos).
 6. Teste pelo celular (seção 8). Ao terminar: apagar o site e o banco.
+
+## 14. RESULTADO DA IMPLANTAÇÃO (executada)
+- **Site:** `mapadomapa-homolog` (ID `6584939b-79bc-46c5-969a-fe54cdfd7bf6`), equipe QVNAds → **https://mapadomapa-homolog.netlify.app**
+- **Acesso:** login da equipe Netlify em **todos** os deploys; site, `/api/*`, `/api/dev/*` e o caminho direto da função respondem **401** sem login (verificado), sem vazar conteúdo.
+- **Banco:** provisionado **neste site** (ramo `production` do banco da homologação), 4 migrações aplicadas. O site oficial continua sem banco.
+- **Variáveis** (só nomes): `APP_ENV`, `STAGING_HOSTNAME`, `VITE_STAGING_SIM`, `PRE_REGISTRATION_OPEN`, `AUTH_SECRET` (secreta, exclusiva). Nenhuma credencial de produção/serviço pago.
+- **Deploys:** 2 (≈ 30 créditos de deploy). Recarga automática **não** ativada.
+- **Oficial:** deploy `6af7f225…` inalterado antes e depois.
+- **Código:** branch `homologacao/etapa-3` enviada ao GitHub (commit `90863d5`); publicação feita por upload de uma exportação limpa da branch (o site novo não está ligado ao Git).
+- **Não validado de dentro da Netlify:** o fluxo de cadastro ponta a ponta no site online, porque o login da equipe me impede de chamar as APIs. Os fluxos foram validados localmente (servidor 20/20 + 15 de homologação; navegador 18/18). O primeiro teste online é o seu.
