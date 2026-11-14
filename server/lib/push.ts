@@ -1,4 +1,3 @@
-import webpush from 'web-push'
 import { now } from './clock'
 import { query } from './db'
 import { env, isSimulationEnvironment } from './env'
@@ -34,6 +33,9 @@ export function endpointAllowed(endpoint: unknown): endpoint is string {
 async function deliver(sub: Sub, payload: string): Promise<void> {
   if (injected) return injected(sub, payload)
   if (isSimulationEnvironment()) { simOutbox.push(JSON.parse(payload)); return }
+  // Carregado só quando há envio real (pacote CommonJS): nunca derruba o carregamento da API.
+  const mod = (await import('web-push')) as unknown as { default?: typeof import('web-push') } & typeof import('web-push')
+  const webpush = mod.default ?? mod
   webpush.setVapidDetails(env('VAPID_SUBJECT') ?? 'https://mapadomapa.netlify.app', env('VAPID_PUBLIC_KEY')!, env('VAPID_PRIVATE_KEY')!)
   await webpush.sendNotification(sub, payload, { TTL: 86_400, urgency: 'normal', timeout: 5000 })
 }
