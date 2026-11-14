@@ -107,3 +107,27 @@ Premissas: 1 site novo, 1 banco novo, 1 a 3 testadores, ~30 dias, sem PR/preview
 | Tráfego (banco + site) | **< 1 GB** |
 **Valor em reais: não consigo calcular** — não tenho o preço do crédito do seu plano. Confira em Netlify → Team → Billing/Usage antes de aprovar.
 Limitadores: não abrir PR (cada preview cria uma ramificação do banco); manter branch deploys desligados; um testador; **apagar o site e o banco ao final** (só o Owner apaga o banco).
+
+## 12. Créditos e risco de cobrança (regras oficiais da Netlify consultadas nesta etapa)
+Tarifas (planos baseados em créditos): deploy de produção bem-sucedido **15 créditos** (falho = 0) · computação de funções **10 créditos/GB-hora** · tráfego **20 créditos/GB** (site e banco) · requisições **2 créditos/10 mil** · **Banco: 10 créditos por unidade de computação** (1 unidade = 25% de 1 vCPU + 1 GB de RAM; padrão: mín. 1, máx. 4 unidades; dorme após 5 min sem uso) · armazenamento do banco: cobrança "a partir de 01/07/2026, taxas a anunciar" (não encontrei a taxa).
+Plano **Pro** (base atual): **3.000 créditos/mês**. Recarga automática vem **desligada**; quando os créditos acabam, **todos os projetos do time pausam** até o próximo ciclo. Recarga (se ligada): **1.500 créditos por US$ 10**. Não há teto de gasto separado: o teto é desligar a recarga.
+
+| Item (30 dias, 1–3 testadores) | Créditos previstos | Pior caso |
+|---|---|---|
+| 15 deploys de produção (15 cada) | 225 | 300 (20 deploys) |
+| Banco: ~8 h ativas × ~1 unidade × 10 | ~80–120 | ~330 (4 unidades) |
+| Funções (~5 mil chamadas) | ~10–20 | 50 |
+| Tráfego + requisições | ~25 | 60 |
+| **Total** | **≈ 350–400** | **≈ 750** |
+Equivale a **~12–13% dos 3.000 créditos** do mês (pior caso 25%). Se pagos por recarga: ≈ US$ 2,5 a US$ 5 — **só se o plano já estiver no limite**.
+
+Riscos de cobrança extra: (1) **esgotar os créditos pausa TODOS os sites do time** (inclusive o oficial) se a recarga estiver desligada — confira o saldo antes; (2) recarga ligada = débito automático de US$ 10 por vez; (3) banco configurado como "sempre ligado" (720 h × 1 unidade ≈ 7.200 créditos) — **não alterar o padrão**; (4) PRs/previews criam ramificações de banco; (5) cobrança de armazenamento quando a Netlify definir a taxa.
+**Não confirmado:** se o time QVNAds está no plano Pro **baseado em créditos** (a tela Billing mostra "Credits" se estiver). Sem isso, o banco não existe para o plano.
+
+## 13. Passo a passo para criar o segundo site (≈ 10 min; só depois da aprovação)
+1. **Nome do site:** `mapadomapa-homolog` (se ocupado, escolha outro). O endereço será `<nome>.netlify.app`.
+2. Netlify → *Add new project → Import from Git* → repositório `pkposites/mapadomapa` → **branch de produção: `homologacao/etapa-3`**. Em *Advanced / variáveis*, antes do 1º deploy, defina: `APP_ENV=staging`, `STAGING_HOSTNAME=<nome>.netlify.app`, `VITE_STAGING_SIM=true`, `AUTH_SECRET` (nova, secreta). **NÃO** defina `PRE_REGISTRATION_OPEN` ainda → o 1º deploy sobe com o pré-cadastro **fechado**.
+3. Não altere as configurações do banco (manter mín. 1 unidade, sono em 5 min). Deixe branch deploys e previews **desligados**.
+4. Assim que o 1º deploy terminar: ative a **proteção por senha do site** (você escolhe a senha). Abra em janela anônima e confirme que pede senha.
+5. Só então defina `PRE_REGISTRATION_OPEN=true` e faça **novo deploy** (15 créditos).
+6. Teste pelo celular (seção 8). Ao terminar: apagar o site e o banco.
