@@ -105,3 +105,21 @@ export const isStagingSimulation = (): boolean => requestContext.getStore()?.sta
 
 /** Ambiente onde simuladores são permitidos: computador local OU homologação validada. NUNCA produção. */
 export const isSimulationEnvironment = (): boolean => isDevEnvironment() || isStagingSimulation()
+
+/**
+ * Verificação do celular.
+ *  - "admin" (PADRÃO, MVP): sem SMS/WhatsApp. A conta nasce ativa e o celular fica NÃO VERIFICADO até um
+ *    administrador validar.
+ *  - "sms": fluxo antigo com código por SMS (mantido para quando houver provedor real).
+ */
+export const verificationMode = (): 'admin' | 'sms' => (env('VERIFICATION_MODE') === 'sms' ? 'sms' : 'admin')
+
+/** Recuperação de senha por código (exige SMS). DESLIGADA no MVP. */
+export const passwordRecoveryEnabled = (): boolean => env('PASSWORD_RECOVERY') === 'sms'
+
+/**
+ * Celulares (E.164, separados por vírgula) que podem criar o PRIMEIRO administrador, mesmo com o
+ * pré-cadastro fechado. Só vale enquanto NÃO existir nenhum admin. Variável secreta (Functions).
+ */
+export const adminBootstrapPhones = (): string[] =>
+  (env('ADMIN_BOOTSTRAP_PHONES') ?? '').split(',').map((x) => x.trim()).filter((x) => /^\+55\d{11}$/.test(x))

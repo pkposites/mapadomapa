@@ -12,6 +12,7 @@ export type SessionUser = {
   userId: string
   status: 'pending' | 'active' | 'disabled'
   phone: string
+  phoneVerified: boolean
   roles: string[]
 }
 
@@ -37,10 +38,11 @@ export async function loadSession(token: string | undefined): Promise<SessionUse
   const t = now()
   const rows = await query<{
     session_id: string; session_created_at: Date; user_id: string
-    status: SessionUser['status']; phone: string; roles: string[] | null
+    status: SessionUser['status']; phone: string; phone_verified: boolean | null; roles: string[] | null
   }>(
     `SELECT s.id AS session_id, s.created_at AS session_created_at, u.id AS user_id, u.status,
             (SELECT e164 FROM phones WHERE user_id = u.id AND is_primary) AS phone,
+            (SELECT verified_at IS NOT NULL FROM phones WHERE user_id = u.id AND is_primary) AS phone_verified,
             (SELECT array_agg(r.name) FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id) AS roles
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > $2`,
@@ -55,6 +57,7 @@ export async function loadSession(token: string | undefined): Promise<SessionUse
     userId: row.user_id,
     status: row.status,
     phone: row.phone,
+    phoneVerified: Boolean(row.phone_verified),
     roles: row.roles ?? [],
   }
 }

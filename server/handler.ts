@@ -1,7 +1,10 @@
 import { audit } from './lib/audit'
 import { addSeconds, now } from './lib/clock'
 import { query } from './lib/db'
-import { isDevEnvironment, isPreRegistrationOpen, isSimulationEnvironment, isStagingSimulation, runInRequestContext } from './lib/env'
+import { isDevEnvironment, isPreRegistrationOpen, isSimulationEnvironment, isStagingSimulation, passwordRecoveryEnabled, runInRequestContext, verificationMode } from './lib/env'
+import { captchaProvider } from './lib/captcha'
+import { issuePowChallenge } from './lib/pow'
+import { enforce } from './lib/rateLimit'
 import {
   ApiError, assertSameOrigin, clearSessionCookie, errorResponse, json, readCookie, readJson,
   SESSION_COOKIE, sessionCookie,
@@ -69,10 +72,20 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   }
 
   // ---------- Estado público (sem dados pessoais) ----------
-  if (method === 'GET' && path === '/status') return json({ preRegistrationOpen: isPreRegistrationOpen() })
+  if (method === 'GET' && path === '/status') {
+    return json({ preRegistrationOpen: isPreRegistrationOpen(), verificationMode: verificationMode(), passwordRecovery: passwordRecoveryEnabled(), captcha: captchaProvider() })
+  }
+  if (method === 'GET' && path === '/captcha/challenge') {
+    if (captchaProvider() !== 'pow') throw new ApiError(404, 'not_found', 'Não encontrado.')
+    await enforce(`pow:issue:${ctx.ip ?? 'unknown'}`, 200, 3600) // anti-"fazenda" de desafios
+    return json(issuePowChallenge())
+  }
 
   // ---------- Cadastro e login ----------
-  if (method === 'POST' && path === '/auth/register') return json(await auth.register(await readJson(req), ctx))
+  if (method === 'POST' && path === '/auth/register') {
+    const r = await auth.register(await readJson(req), ctx)
+    return 'session' in r ? withSession(req, r.body, r.session) : json(r)
+  }
   if (method === 'POST' && path === '/auth/resend-code') return json(await auth.resendSignupCode(await readJson(req), ctx))
   if (method === 'POST' && path === '/auth/verify-phone') {
     const r = await auth.verifyPhone(await readJson(req), ctx)

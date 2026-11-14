@@ -11,7 +11,8 @@ Nunca: SMS real, OpenAI paga, eventos reais da Meta, CAPTCHA real, credenciais d
 O "modo homologação" só liga se **todas** as condições forem verdadeiras; qualquer falha = comporta-se como **produção** (falha fechada):
 1. `APP_ENV=staging`;
 2. `STAGING_HOSTNAME` definido e **igual** ao endereço pelo qual a requisição chegou (o site oficial nunca coincide);
-3. **nenhuma** credencial/serviço real no ambiente: `META_CAPI_ACCESS_TOKEN`, `OPENAI_API_KEY`, `TURNSTILE_SECRET_KEY`, `SMS_PROVIDER` (≠ `dev`), `AI_PROVIDER=openai`, `CAPTCHA_PROVIDER=turnstile`.
+3. **nenhuma** credencial/serviço real escolhido por nós: `META_CAPI_ACCESS_TOKEN`, `TURNSTILE_SECRET_KEY`, `SMS_PROVIDER` (≠ `dev`), `AI_PROVIDER=openai`, `CAPTCHA_PROVIDER=turnstile`.
+   - **`OPENAI_API_KEY` não entra nessa lista**: a Netlify (AI Gateway) injeta essa variável automaticamente em todos os sites. Em homologação a IA é sempre simulada (a chave nunca é lida) e, fora dela, a OpenAI só é chamada com `AI_PROVIDER=openai` explícito.
 
 Quando ligado, libera **apenas** os simuladores que já existem localmente (SMS que grava no banco, CAPTCHA simulado, IA simulada, Meta simulado) e a rota `/api/dev/*`. Respostas levam `X-Robots-Tag: noindex`; o site mostra a faixa **"AMBIENTE DE TESTES"**; cookies são `Secure`. O pré-cadastro só abre com `PRE_REGISTRATION_OPEN=true` explícito.
 Testes automatizados: 15 (cada salvaguarda é derrubada individualmente e o sistema volta a recusar SMS/painel).
@@ -131,3 +132,16 @@ Riscos de cobrança extra: (1) **esgotar os créditos pausa TODOS os sites do ti
 4. Assim que o 1º deploy terminar: ative a **proteção por senha do site** (você escolhe a senha). Abra em janela anônima e confirme que pede senha.
 5. Só então defina `PRE_REGISTRATION_OPEN=true` e faça **novo deploy** (15 créditos).
 6. Teste pelo celular (seção 8). Ao terminar: apagar o site e o banco.
+
+## 14. RESULTADO DA IMPLANTAÇÃO (executada)
+- **Site:** `mapadomapa-homolog` (ID `6584939b-79bc-46c5-969a-fe54cdfd7bf6`), equipe QVNAds → **https://mapadomapa-homolog.netlify.app**
+- **Acesso:** login da equipe Netlify em **todos** os deploys; site, `/api/*`, `/api/dev/*` e o caminho direto da função respondem **401** sem login (verificado), sem vazar conteúdo.
+- **Banco:** provisionado **neste site** (ramo `production` do banco da homologação), 4 migrações aplicadas. O site oficial continua sem banco.
+- **Variáveis** (só nomes): `APP_ENV`, `STAGING_HOSTNAME`, `VITE_STAGING_SIM`, `PRE_REGISTRATION_OPEN`, `AUTH_SECRET` (secreta, exclusiva). Nenhuma credencial de produção/serviço pago.
+- **Deploys:** 2 (≈ 30 créditos de deploy). Recarga automática **não** ativada.
+- **Oficial:** deploy `6af7f225…` inalterado antes e depois.
+- **Código:** branch `homologacao/etapa-3` enviada ao GitHub (commit `90863d5`); publicação feita por upload de uma exportação limpa da branch (o site novo não está ligado ao Git).
+- **Não validado de dentro da Netlify:** o fluxo de cadastro ponta a ponta no site online, porque o login da equipe me impede de chamar as APIs. Os fluxos foram validados localmente (servidor 20/20 + 15 de homologação; navegador 18/18). O primeiro teste online é o seu.
+
+## 15. Correção: chave do AI Gateway derrubava a homologação
+Sintoma (logs da Netlify): `POST /api/auth/register` 503, `GET /api/dev/sms` 404, "simulação RECUSADA: credenciais/serviços reais presentes (OPENAI_API_KEY)". Causa: a Netlify injeta `OPENAI_API_KEY` pelo AI Gateway; a trava a tratava como credencial real. Correção: a chave sozinha deixou de ser proibida; a proteção contra chamadas externas continua (IA sempre simulada em homologação; OpenAI só com `AI_PROVIDER=openai`). Testes: 19/19 no modo homologação, incluindo chave do gateway presente + nenhuma chamada externa.

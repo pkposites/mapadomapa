@@ -1,5 +1,6 @@
 import { env, isSimulationEnvironment } from './env'
 import { ApiError } from './http'
+import { verifyPow } from './pow'
 
 /**
  * CAPTCHA anti-robô nas rotas que ENVIAM SMS (cadastro, reenvio e recuperação).
@@ -20,10 +21,11 @@ const unavailable = () =>
 const failed = () =>
   new ApiError(400, 'captcha_failed', 'Não conseguimos confirmar que você não é um robô. Marque a verificação e tente de novo.')
 
-type Provider = 'dev' | 'turnstile' | null
+type Provider = 'dev' | 'turnstile' | 'pow' | null
 export function captchaProvider(): Provider {
   const p = env('CAPTCHA_PROVIDER') ?? (isSimulationEnvironment() ? 'dev' : undefined)
   if (p === 'dev' && isSimulationEnvironment()) return 'dev' // o simulador nunca vale em produção
+  if (p === 'pow') return 'pow' // desafio próprio, sem serviço externo (precisa de AUTH_SECRET)
   if (p === 'turnstile' && (env('TURNSTILE_SECRET_KEY') ?? '').length >= 10) return 'turnstile'
   return null
 }
@@ -39,6 +41,17 @@ export async function verifyCaptcha(token: unknown, ip?: string): Promise<void> 
   }
   if (provider === 'dev') {
     if (token !== DEV_CAPTCHA_TOKEN) throw failed()
+    return
+  }
+  if (provider === 'pow') {
+    let ok = false
+    try {
+      ok = await verifyPow(token)
+    } catch (err) {
+      console.error('[captcha] pow indisponível:', (err as Error).message) // ex.: AUTH_SECRET ausente
+      throw unavailable()
+    }
+    if (!ok) throw failed()
     return
   }
 

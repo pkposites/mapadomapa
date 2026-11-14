@@ -21,18 +21,21 @@ export default function Conta() {
   if (!user) return null
 
   return (
-    <AuthShell eyebrow="Minha conta" title="Seu pré-cadastro está confirmado!" subtitle={<>Você já está dentro. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>}>
+    <AuthShell eyebrow="Minha conta" title="Sua conta está criada!" subtitle={<>Você já está dentro. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>}>
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-lime text-graphite">
             <CheckCircle2 size={22} strokeWidth={2} aria-hidden="true" />
           </span>
           <div className="leading-tight">
-            <p className="text-[13px] text-muted">Celular confirmado</p>
+            <p className="text-[13px] text-muted">{user.phoneVerified ? 'Celular verificado' : 'Celular ainda não verificado'}</p>
             <p className="text-[18px] font-semibold" data-testid="account-phone">{user.phone}</p>
           </div>
         </div>
 
+        {!user.phoneVerified && (
+          <p className="rounded-2xl bg-ice p-4 text-[15px] leading-snug text-muted">Seu celular será verificado pela nossa equipe. Enquanto isso você já pode preencher o cadastro profissional.</p>
+        )}
         <p className="text-[16px] leading-relaxed text-muted">
           Em breve você poderá escolher até 2 profissões e completar o seu perfil para estar pronto quando os pedidos começarem.
         </p>
