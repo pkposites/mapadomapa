@@ -17,6 +17,8 @@ type Work = {
   weekdays: string[]; periods: string[]; emergency: boolean
   ownTools: string; vehicle: string; structure: string
 }
+// 4 passos do cadastro completo: 1 conta · 2 profissões e regiões · 3 trabalho · 4 perguntas e envio
+const MACRO = [2, 2, 3, 4, 4]
 const TITLES = ['Suas profissões', 'Onde você atende', 'Seu trabalho', 'Perguntas técnicas', 'Revisar e enviar']
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
 
@@ -152,11 +154,11 @@ export default function Profissional() {
       <h2 className="mt-4 text-[24px] font-bold tracking-tight">Cadastro enviado!</h2>
       <p className="mt-2 text-[16px] leading-relaxed text-muted">{state.approvalNote}</p>
       <p className="mt-2 text-[14px] text-muted">Status: <strong className="text-graphite">em análise</strong>. Você não precisa fazer mais nada agora.</p>
-      <div className="mt-6"><Button to="/conta" variant="dark" fullWidth>Voltar para minha conta</Button></div>
+      <div className="mt-6"><Button to="/area" variant="dark" fullWidth>Ir para minha área</Button></div>
     </div>
   ) : (
     <>
-      <Lead title="Confira e envie" text="Revise suas informações. Depois de enviar, não será possível editar enquanto analisamos." />
+      <Lead title="Confira e envie" text="Revise suas informações. Depois de enviar, você ainda pode atualizar nome, foto, apresentação, experiência e regiões em Meu Perfil enquanto analisamos. Para trocar de profissão ou de respostas, fale com a equipe." />
       <Block title="Profissões">{state.professions.map((p) => <p key={p.slug} className="text-[16px]">{p.name} · {p.experienceYears} anos · {cat.options.levels.find((l) => l.id === p.selfLevel)?.label}</p>)}</Block>
       <Block title="Regiões"><p className="text-[16px]">{state.regions.map(nameOf).join(' e ')}</p></Block>
       <Block title="Perguntas técnicas">{state.professions.map((p) => <p key={p.slug} className="text-[16px]">{p.name}: {state.progress.assessment[p.slug].answered} de {state.progress.assessment[p.slug].total} respondidas</p>)}</Block>
@@ -192,7 +194,7 @@ export default function Profissional() {
             {step <= 3 ? <SubmitButton type="button" loading={busy} disabled={!canNext} onClick={next}>Continuar</SubmitButton>
               : <SubmitButton type="button" loading={busy} onClick={submit}>Enviar para análise</SubmitButton>}
           </div>
-          <p className="mx-auto mt-2 max-w-lg text-center"><button type="button" className="py-3 text-[14px] font-medium text-muted underline underline-offset-4" onClick={() => navigate('/conta')}>Salvar e continuar depois</button></p>
+          <p className="mx-auto mt-2 max-w-lg text-center"><button type="button" className="py-3 text-[14px] font-medium text-muted underline underline-offset-4" onClick={() => navigate('/area')}>Salvar e continuar depois</button></p>
         </div>
       )}
     </Shell>
@@ -207,7 +209,7 @@ function Shell({ children, step, locked }: { children: React.ReactNode; step?: n
         <div className="mx-auto max-w-lg px-5 pb-6 pt-6 md:pt-10">
           {step && !locked && (
             <div className="mb-6">
-              <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Passo {step} de 5 · {TITLES[step - 1]}</p>
+              <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Passo {MACRO[step - 1]} de 4 · {TITLES[step - 1]}</p>
               <div className="mt-3 flex gap-1.5" role="progressbar" aria-valuemin={1} aria-valuemax={5} aria-valuenow={step}>
                 {[1, 2, 3, 4, 5].map((n) => <span key={n} className={`h-1.5 flex-1 rounded-full ${n <= step ? 'bg-graphite' : 'bg-line'}`} />)}
               </div>

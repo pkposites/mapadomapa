@@ -55,8 +55,8 @@ export default function LegalPage({ title, intro, sections }: Props) {
             <p className="text-[15px] leading-snug">
               <strong className="font-semibold">Rascunho pendente de revisão jurídica.</strong>{' '}
               <span className="text-muted">
-                Este texto é uma base de trabalho e não é o documento final. Ele precisa ser
-                revisado e aprovado por um advogado antes da abertura do cadastro real.
+                Este texto descreve como o pré-cadastro funciona hoje, mas ainda não é o documento
+                final: precisa ser revisado por um advogado e completado com os dados da empresa.
               </span>
             </p>
           </div>

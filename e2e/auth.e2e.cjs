@@ -241,11 +241,11 @@ async function overflow(page) { return page.evaluate(() => document.documentElem
   await closedPage.route('**/api/status', (r) => r.fulfill({ json: { preRegistrationOpen: false } }))
   await closedPage.goto(B + '/cadastro')
   await closedPage.waitForSelector('text=O pré-cadastro abre em breve')
-  check('pré-cadastro fechado: mostra aviso e a data dos pedidos, sem formulário', (await closedPage.locator('input').count()) === 0 && (await closedPage.locator('body').innerText()).includes('25/12/2026'))
+  check('pré-cadastro fechado: mostra aviso e a data dos pedidos, sem formulário', (await closedPage.locator('input').count()) === 0 && (await closedPage.locator('body').innerText()).includes('25/11/2026'))
   await closedPage.close()
   await page.goto(B + '/')
   const landingText = (await page.locator('body').innerText()).replace(/\s+/g, ' ')
-  check('landing diz "Pedidos de orçamento abrem em 25/12/2026"', /pedidos de orçamento abrem em/i.test(landingText) && landingText.includes('25/12/2026'))
+  check('landing diz "Pedidos de orçamento abrem em 25/11/2026"', /pedidos de orçamento abrem em/i.test(landingText) && landingText.includes('25/11/2026'))
   check('landing explica que o pré-cadastro é gratuito e a data é dos pedidos', /o pré-cadastro é gratuito/i.test(landingText) && /abertura dos pedidos/i.test(landingText))
 
   console.log('\n[10] Landing pública e cabeçalho')

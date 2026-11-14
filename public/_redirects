@@ -1,0 +1,15 @@
+# Rotas do app (React SPA) -> index.html com status 200.
+# Qualquer outro endereço sem arquivo correspondente recebe a página public/404.html com status 404.
+# Arquivos que existem (assets, sw.js, manifest, ícones) são servidos antes destas regras.
+# A API (/api/*) é tratada no netlify.toml. Ao criar uma rota nova no app, inclua-a aqui e em
+# navigateFallbackAllowlist (vite.config.ts).
+/cadastro        /index.html  200
+/entrar          /index.html  200
+/privacidade     /index.html  200
+/termos          /index.html  200
+/conta           /index.html  200
+/profissional    /index.html  200
+/area            /index.html  200
+/area/*          /index.html  200
+/admin           /index.html  200
+/admin/*         /index.html  200

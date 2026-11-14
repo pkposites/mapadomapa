@@ -1,10 +1,11 @@
 /**
- * Questionário técnico por profissão (4 situacionais objetivas + 1 aberta).
+ * Questionário técnico por profissão. v2 (2026-11): 3 situações práticas objetivas por profissão (máx. 6 para 2 profissões).
+ * ALL_QUESTIONS guarda o banco completo da v1 (5 perguntas) só para exibir respostas antigas ao revisor.
  * ATENÇÃO: os pontos e os alertas de risco ficam SÓ no servidor. O navegador recebe apenas o texto
  * (ver publicQuestionnaire), para que as respostas não possam ser "descobertas" inspecionando a página.
  * O conteúdo é uma proposta inicial: deve ser revisado por especialistas de cada área antes do lançamento.
  */
-export const QUESTIONNAIRE_VERSION = '2026-11-v1'
+export const QUESTIONNAIRE_VERSION = '2026-11-v2'
 
 type Pts = 0 | 1 | 3
 type Opt = { id: 'a' | 'b' | 'c'; text: string; points: Pts; risk?: string }
@@ -18,7 +19,7 @@ const open = (id: string, prompt: string, keywords: string[]): OpenQuestion => (
   id, kind: 'open', prompt, hint: 'Conte como você faria, passo a passo. Não coloque nomes nem telefones.', keywords,
 })
 
-export const QUESTIONNAIRES: Record<string, Question[]> = {
+export const ALL_QUESTIONS: Record<string, Question[]> = {
   encanadores: [
     q('enc1', 'Você chega num chamado com vazamento forte e água se espalhando pela casa. O que faz primeiro?',
       o('a', 'Troco o cano na hora, sem olhar mais nada.', 0, 'sem_isolar_agua'),
@@ -200,6 +201,22 @@ export const QUESTIONNAIRES: Record<string, Question[]> = {
       ['documento', 'identidade', 'comprovante', 'dano', 'orçamento', 'segurança', 'confirmar']),
   ],
 }
+
+/** Perguntas ATIVAS (v2): 3 situações práticas por profissão. Os ids são os mesmos da v1, então respostas já dadas continuam valendo. */
+const ACTIVE_IDS: Record<string, string[]> = {
+  encanadores: ['enc1', 'enc3', 'enc4'],
+  eletricistas: ['ele1', 'ele2', 'ele3'],
+  instaladores: ['ins1', 'ins2', 'ins4'],
+  pintores: ['pin1', 'pin2', 'pin3'],
+  faxineiras: ['fax1', 'fax3', 'fax4'],
+  'montadores-de-moveis': ['mon1', 'mon2', 'mon3'],
+  dedetizacao: ['ded1', 'ded2', 'ded3'],
+  guincho: ['gui1', 'gui2', 'gui4'],
+  chaveiros: ['cha1', 'cha3', 'cha4'],
+}
+export const QUESTIONNAIRES: Record<string, Question[]> = Object.fromEntries(
+  Object.entries(ALL_QUESTIONS).map(([slug, qs]) => [slug, (ACTIVE_IDS[slug] ?? []).map((id) => qs.find((x) => x.id === id)!).filter(Boolean)]),
+)
 
 /** Versão pública: SEM pontos, SEM alertas de risco e SEM palavras-chave. */
 export function publicQuestionnaire(slug: string) {

@@ -1,7 +1,7 @@
 # Mapa do Mapa
 
 Plataforma que conecta profissionais autônomos a clientes em São Paulo.
-**Etapa 1:** landing page de pré-lançamento (abertura prevista: 25/12/2026).
+**Etapa 1:** landing page de pré-lançamento (abertura prevista: 25/11/2026).
 
 ## Stack
 React + TypeScript + Vite · Tailwind CSS v4 · PWA (vite-plugin-pwa) · Netlify

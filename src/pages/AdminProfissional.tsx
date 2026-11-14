@@ -9,6 +9,10 @@ import SubmitButton from '../components/ui/SubmitButton'
 import AdminGate from '../admin/AdminGate'
 import StatusBadge from '../admin/StatusBadge'
 import type { Detail, Status } from '../admin/types'
+import { Thread } from './area/Mensagens'
+import WelcomeBox from '../admin/WelcomeBox'
+import { SITE } from '../config/site'
+import type { Msg } from '../area/types'
 import { api, ApiError } from '../lib/api'
 
 type Action = 'approve' | 'request_changes' | 'reject' | 'suspend' | 'reinstate'
@@ -25,6 +29,18 @@ const FOR_STATUS: Partial<Record<Status, Action[]>> = {
 const DAY: Record<string, string> = { seg: 'Seg', ter: 'Ter', qua: 'Qua', qui: 'Qui', sex: 'Sex', sab: 'Sáb', dom: 'Dom' }
 const PERIOD: Record<string, string> = { manha: 'manhã', tarde: 'tarde', noite: 'noite' }
 const ACTION_LABEL: Record<string, string> = { approve: 'Aprovado', reject: 'Rejeitado', request_changes: 'Ajustes pedidos', suspend: 'Suspenso', reinstate: 'Reativado', verify_phone: 'Celular verificado', unverify_phone: 'Verificação do celular removida' }
+const WELCOME_DEFAULT = `Olá, [nome]! 👋
+
+Seja bem-vindo ao Mapa do Mapa!
+
+Estamos preparando tudo para o início dos pedidos de orçamento, previsto para ${SITE.requestsOpenLabel}.
+
+Enquanto isso, complete seu perfil e acompanhe os comunicados por aqui.
+
+Qualquer dúvida, pode conversar com nossa equipe nesta área.
+
+Equipe Mapa do Mapa 💚`
+const firstNamed = (t: string, full: string | null) => { const f = full?.trim().split(/\s+/)[0]; return f ? t.replace(/\[nome\]/gi, f) : t.replace(/,\s*\[nome\]/gi, '').replace(/\[nome\]/gi, '') }
 const fmt = (d: string) => new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 
 export default function AdminProfissional() {
@@ -59,10 +75,42 @@ function Page() {
   return (
     <Shell>
       <Link to="/admin" className="inline-flex min-h-11 items-center gap-2 text-[15px] font-semibold"><ArrowLeft size={20} aria-hidden="true" /> Voltar à lista</Link>
-      <div className="mt-2 flex flex-wrap items-center gap-3"><h1 className="text-[28px] font-bold tracking-[-0.02em]">{d.phone}</h1><StatusBadge status={d.reviewStatus} /></div>
+      <div className="mt-2 flex flex-wrap items-center gap-3"><h1 className="text-[28px] font-bold tracking-[-0.02em]">{d.fullName ?? d.phone}</h1><StatusBadge status={d.reviewStatus} /></div>
       {msg && <div className="mt-3"><Alert tone="success">{msg}</Alert></div>}
       {err && <div className="mt-3"><Alert tone="error">{err}</Alert></div>}
       {d.reviewNotes && <p className="mt-3 rounded-2xl bg-white p-4 text-[15px]"><strong>Última observação:</strong> {d.reviewNotes}</p>}
+
+      <Block title="Perfil">
+        <div className="flex items-start gap-4">
+          <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-full bg-ice text-muted">
+            {d.hasPhoto ? <img src={`/api/admin/professionals/${d.id}/photo`} alt="Foto do profissional" className="size-full object-cover" /> : '—'}
+          </div>
+          <div className="min-w-0 text-[15px] leading-snug">
+            <p><strong>Nome:</strong> {d.fullName ?? 'não informado'}</p>
+            <p className="mt-1"><strong>Apresentação:</strong> {d.bio ?? '—'}</p>
+            <p className="mt-1"><strong>Serviços:</strong> {d.services ?? '—'}</p>
+            <p className="mt-1"><strong>Outras informações:</strong> {d.extraInfo ?? '—'}</p>
+          </div>
+        </div>
+        {d.profileEvents.length > 0 && (
+          <div className="mt-4 rounded-2xl bg-ice p-3"><p className="text-[14px] font-semibold">Alterações feitas pelo profissional</p>
+            <ul className="mt-1 space-y-1 text-[14px]">{d.profileEvents.map((e, i) => <li key={i}>{fmt(e.at)} · {e.details ?? e.kind}</li>)}</ul></div>
+        )}
+      </Block>
+
+      <Block title="Boas-vindas">
+        <WelcomeBox openLabel="Enviar boas-vindas" template={WELCOME_DEFAULT}
+          disabledReason={d.welcomeSent ? 'As boas-vindas já foram enviadas para este profissional.' : null}
+          confirmText={`Enviar boas-vindas para ${d.fullName?.split(/\s+/)[0] ?? 'este profissional'}?`}
+          preview={(b) => firstNamed(b, d.fullName)}
+          send={async (body) => { await api.post(`/admin/professionals/${d.id}/welcome`, { body }); await load(); return 'Boas-vindas enviadas.' }} />
+      </Block>
+
+      <Block title={`Mensagens${d.unreadMessages ? ` (${d.unreadMessages} não lida(s))` : ''}`}>
+        <Thread mine="admin"
+          load={() => api.get<{ messages: Msg[] }>(`/admin/professionals/${d.id}/messages`).then((r) => r.messages)}
+          send={(body) => api.post<{ messages: Msg[] }>(`/admin/professionals/${d.id}/messages`, { body }).then((r) => r.messages)} />
+      </Block>
 
       <Block title="Celular">
         <p className="flex items-center gap-2 text-[16px]">{d.phoneVerified ? <><BadgeCheck size={20} aria-hidden="true" /> Verificado pela equipe</> : <><ShieldAlert size={20} aria-hidden="true" /> Ainda não verificado</>}</p>

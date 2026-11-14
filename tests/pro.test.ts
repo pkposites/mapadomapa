@@ -48,7 +48,7 @@ describe('Acesso e dados oficiais', () => {
     const s = await call('PUT', '/pro/professions', { professions: ['eletricistas', 'chaveiros'] })
     const text = JSON.stringify(s.body.questionnaires)
     expect(Object.keys(s.body.questionnaires)).toEqual(['eletricistas', 'chaveiros'])
-    expect(s.body.questionnaires.eletricistas).toHaveLength(5)
+    expect(s.body.questionnaires.eletricistas).toHaveLength(3)
     for (const leak of ['points', 'risk', 'keywords', 'risco:']) expect(text).not.toContain(leak)
   })
 })
@@ -109,7 +109,7 @@ describe('Validação dos dados de trabalho e respostas', () => {
     await call('PUT', '/pro/professions', { professions: ['pintores'] })
     expect((await call('PUT', '/pro/answers', { profession: 'guincho', answers: [{ questionId: 'gui1', choice: 'a' }] })).body.error.code).toBe('invalid_profession')
     expect((await call('PUT', '/pro/answers', { profession: 'pintores', answers: [{ questionId: 'pin1', choice: 'z' }] })).body.error.code).toBe('invalid_choice')
-    expect((await call('PUT', '/pro/answers', { profession: 'pintores', answers: [{ questionId: 'pin5', text: 'x'.repeat(801) }] })).body.error.code).toBe('text_too_long')
+    expect((await call('PUT', '/pro/answers', { profession: 'pintores', answers: [{ questionId: 'pin5', text: 'qualquer coisa' }] })).body.error.code).toBe('invalid_question') // v2: sem pergunta aberta
     expect((await call('PUT', '/pro/answers', { profession: 'pintores', answers: [{ questionId: 'eletrica', choice: 'a' }] })).body.error.code).toBe('invalid_question')
   })
 })
@@ -125,7 +125,7 @@ describe('Continuidade do cadastro', () => {
     await call('PUT', '/pro/answers', { profession: 'faxineiras', answers: [best('faxineiras')[0]] }) // parcial
     const s = (await call('GET', '/pro/profile')).body
     expect(s.nextStep).toBe(4)
-    expect(s.progress.assessment.faxineiras).toEqual({ answered: 1, total: 5 })
+    expect(s.progress.assessment.faxineiras).toEqual({ answered: 1, total: 3 })
     const again = await api('POST', '/auth/login', { body: { phone: '(11) 91234-5678', password: 'minha-senha-segura-42' } })
     const s2 = (await api('GET', '/pro/profile', { cookie: again.cookie })).body
     expect(s2.profile.workStructure).toBe('solo')
@@ -152,8 +152,8 @@ describe('Envio, pontuação técnica e revisão humana', () => {
     expect(JSON.stringify(r.body)).not.toMatch(/score|pontua/i) // o usuário não vê notas
     const ta = await query<any>('SELECT * FROM technical_assessments WHERE user_id = $1 ORDER BY profession_id', [id])
     expect(ta).toHaveLength(2)
-    for (const t of ta) { expect(t.rule_score).toBe(100); expect(t.ai_score).toBeGreaterThan(0); expect(t.requires_human_review).toBe(true) }
-    expect((await query<any>('SELECT DISTINCT provider FROM ai_evaluations')).map((x) => x.provider)).toEqual(['sim'])
+    for (const t of ta) { expect(t.rule_score).toBe(100); expect(t.ai_score).toBeNull(); expect(t.technical_score).toBe(100); expect(t.questionnaire_version).toBe('2026-11-v2'); expect(t.requires_human_review).toBe(true) }
+    expect(await query<any>('SELECT 1 FROM ai_evaluations')).toHaveLength(0) // v2: sem pergunta aberta, IA não é chamada
     expect((await call('PUT', '/pro/regions', { regions: ['centro'] })).body.error.code).toBe('profile_locked')
     expect((await call('POST', '/pro/submit')).body.error.code).toBe('profile_locked')
   })
@@ -195,7 +195,8 @@ describe('Envio, pontuação técnica e revisão humana', () => {
   })
 })
 
-describe('Integração OpenAI (preparada; nunca chamada localmente)', () => {
+// v2 (3 perguntas objetivas) não tem pergunta aberta: a avaliação por IA fica preparada, mas desligada neste formato.
+describe.skip('Integração OpenAI (preparada; nunca chamada localmente)', () => {
   const saved = { ...process.env }
   const realFetch = globalThis.fetch
   let calls: { url: string; headers: any; body: any }[] = []

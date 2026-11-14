@@ -12,8 +12,16 @@ import {
 import { parseBrazilMobile } from './lib/phone'
 import { loadSession, requireAdmin, requireUser, revokeSession } from './lib/sessions'
 import * as pro from './pro/service'
+import * as area from './pro/area'
+import * as feed from './pro/feed'
+import * as boost from './pro/boost'
 import * as adm from './admin/service'
 import * as auth from './services/auth'
+
+function photoResponse(p: { type: string; data: Buffer } | null): Response {
+  if (!p) return json({ error: { code: 'not_found', message: 'Sem foto.' } }, 404)
+  return new Response(new Uint8Array(p.data), { status: 200, headers: { 'content-type': p.type, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } })
+}
 
 export type ApiContext = { ip?: string }
 
@@ -123,15 +131,65 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (method === 'PUT' && path === '/pro/work') return json(await pro.setWork(me.userId, await readJson(req)))
     if (method === 'PUT' && path === '/pro/answers') return json(await pro.saveAnswers(me.userId, await readJson(req)))
     if (method === 'POST' && path === '/pro/submit') return json(await pro.submit(me.userId, ctx.ip))
+    if (method === 'GET' && path === '/pro/feed') return json(await feed.listFeed(me.userId, url.searchParams.get('before')))
+    if (method === 'POST' && path === '/pro/feed') return json(await feed.createPost(me.userId, await readJson(req)))
+    const fc = path.match(/^\/pro\/feed\/comments\/(\d{1,15})$/)
+    if (fc && method === 'DELETE') return json(await feed.deleteOwnComment(me.userId, fc[1]))
+    const fp = path.match(/^\/pro\/feed\/(\d{1,15})(\/report|\/like|\/comments)?$/)
+    if (fp && method === 'DELETE' && !fp[2]) return json(await feed.deleteOwnPost(me.userId, fp[1]))
+    if (fp && method === 'POST' && fp[2] === '/report') return json(await feed.reportPost(me.userId, fp[1]))
+    if (fp && method === 'PUT' && fp[2] === '/like') return json(await feed.setLike(me.userId, fp[1], (await readJson(req)).liked === true))
+    if (fp && method === 'GET' && fp[2] === '/comments') return json(await feed.listComments(me.userId, fp[1]))
+    if (fp && method === 'POST' && fp[2] === '/comments') return json(await feed.addComment(me.userId, fp[1], await readJson(req)))
+    if (method === 'GET' && path === '/pro/boost') return json(await boost.getBoost(me.userId))
+    if (method === 'PUT' && path === '/pro/boost') return json(await boost.setBoost(me.userId, await readJson(req)))
+    if (method === 'DELETE' && path === '/pro/boost') return json(await boost.removeBoost(me.userId))
+    if (method === 'GET' && path === '/pro/push') return json(await area.pushStatus(me.userId))
+    if (method === 'POST' && path === '/pro/push/subscribe') return json(await area.pushSubscribe(me.userId, await readJson(req)))
+    if (method === 'PUT' && path === '/pro/push/prefs') return json(await area.pushPrefs(me.userId, await readJson(req)))
+    if (method === 'POST' && path === '/pro/push/unsubscribe') return json(await area.pushUnsubscribe(me.userId, await readJson(req)))
+    // Área do profissional (Etapa 5)
+    if (method === 'GET' && path === '/pro/home') return json(await area.home(me.userId))
+    if (method === 'GET' && path === '/pro/me') return json(await area.getMe(me.userId))
+    if (method === 'PUT' && path === '/pro/me') return json(await area.updateMe(me.userId, await readJson(req)))
+    if (method === 'PUT' && path === '/pro/me/work') return json(await area.updateWork(me.userId, await readJson(req)))
+    if (method === 'PUT' && path === '/pro/me/regions') return json(await area.changeRegions(me.userId, await readJson(req)))
+    if (method === 'PUT' && path === '/pro/photo') return json(await area.setPhoto(me.userId, await readJson(req)))
+    if (method === 'DELETE' && path === '/pro/photo') return json(await area.removePhoto(me.userId))
+    if (method === 'GET' && path === '/pro/photo') return photoResponse(await area.getPhoto(me.userId))
+    if (method === 'GET' && path === '/pro/messages') return json(await area.thread(me.userId, 'professional'))
+    if (method === 'GET' && path === '/pro/messages/unread') return json({ unread: await area.unreadCount(me.userId) })
+    if (method === 'POST' && path === '/pro/messages') { const b = await readJson(req); return json(await area.postMessage(me.userId, 'professional', me.userId, b.body, b.kind === 'change_request' ? 'change_request' : 'message')) }
+    if (method === 'GET' && path === '/pro/announcements') return json(await area.listAnnouncements(me.userId))
+    if (method === 'POST' && path === '/pro/announcements/read') return json(await area.markAnnouncementsRead(me.userId))
   }
 
   // ---------- Administração (apenas a base: guarda de permissão; painel vem depois) ----------
   if (path.startsWith('/admin/') && path !== '/admin/ping') {
     const admin = requireAdmin(await loadSession(token))
-    const m = path.match(/^\/admin\/professionals\/([0-9a-f-]{36})(\/decision|\/phone)?$/)
+    const m = path.match(/^\/admin\/professionals\/([0-9a-f-]{36})(\/decision|\/phone|\/messages|\/photo|\/welcome)?$/)
     if (method === 'GET' && path === '/admin/stats') return json(await adm.stats())
     if (method === 'GET' && path === '/admin/professionals') return json(await adm.list({ status: url.searchParams.get('status'), q: url.searchParams.get('q'), page: url.searchParams.get('page') }))
     if (m && method === 'GET' && !m[2]) return json(await adm.detail(admin.userId, m[1], ctx.ip))
+    if (m && method === 'GET' && m[2] === '/messages') return json(await adm.threadFor(m[1]))
+    if (m && method === 'POST' && m[2] === '/messages') return json(await adm.sendMessage(admin.userId, m[1], (await readJson(req)).body))
+    if (m && method === 'GET' && m[2] === '/photo') return photoResponse(await area.getPhoto(m[1]))
+    if (m && method === 'POST' && m[2] === '/welcome') return json(await adm.sendWelcome(admin.userId, m[1], (await readJson(req)).body))
+    if (method === 'GET' && path === '/admin/welcome') return json(await adm.welcomeInfo())
+    if (method === 'POST' && path === '/admin/welcome-all') return json(await adm.sendWelcomeAll(admin.userId, (await readJson(req)).body))
+    if (method === 'GET' && path === '/admin/boost') return json(await boost.adminBoost())
+    if (method === 'GET' && path === '/admin/feed') return json(await feed.adminFeed())
+    const fac = path.match(/^\/admin\/feed\/(\d{1,15})\/comments$/)
+    if (fac && method === 'GET') return json(await feed.adminComments(fac[1]))
+    const fah = path.match(/^\/admin\/feed\/comments\/(\d{1,15})$/)
+    if (fah && method === 'PUT') return json(await feed.adminHideComment(admin.userId, fah[1], (await readJson(req)).hidden === true))
+    const fa = path.match(/^\/admin\/feed\/(\d{1,15})$/)
+    if (fa && method === 'PUT') { const b = await readJson(req); return json(await feed.adminSetHidden(admin.userId, fa[1], b.hidden === true, b.reason)) }
+    if (method === 'GET' && path === '/admin/inbox') return json(await adm.inbox())
+    if (method === 'GET' && path === '/admin/announcements') return json(await adm.adminAnnouncements())
+    if (method === 'POST' && path === '/admin/announcements') return json(await adm.createAnnouncement(admin.userId, await readJson(req)))
+    const an = path.match(/^\/admin\/announcements\/(\d{1,12})$/)
+    if (an && method === 'PUT') return json(await adm.setAnnouncementPublished(admin.userId, an[1], (await readJson(req)).published === true))
     if (m && method === 'POST' && m[2] === '/decision') return json(await adm.decide(admin.userId, m[1], await readJson(req), ctx.ip))
     if (m && method === 'POST' && m[2] === '/phone') return json(await adm.setPhoneVerified(admin.userId, m[1], (await readJson(req)).verified === true, ctx.ip))
   }
@@ -160,7 +218,10 @@ export async function handleApi(req: Request, apiCtx: ApiContext = {}): Promise<
       return res
     })
   } catch (err) {
-    if (err instanceof ApiError) return errorResponse(err)
+    if (err instanceof ApiError) {
+      if (err.status >= 400) console.warn(`[api] ${req.method} ${new URL(req.url).pathname} -> ${err.status} ${err.code}`)
+      return errorResponse(err)
+    }
     console.error('[api] erro inesperado:', err)
     return json({ error: { code: 'server_error', message: 'Algo deu errado do nosso lado. Tente de novo em instantes.' } }, 500)
   }

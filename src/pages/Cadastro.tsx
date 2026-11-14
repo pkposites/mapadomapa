@@ -10,7 +10,7 @@ import Button from '../components/Button'
 import Spinner from '../components/ui/Spinner'
 import { useAuth } from '../auth/AuthContext'
 import { api, ApiError } from '../lib/api'
-import { getStatus } from '../lib/status'
+import { getStatus, peekStatus } from '../lib/status'
 import { isPhoneComplete } from '../lib/phone'
 import { mmss, useCooldown } from '../hooks/useCooldown'
 import { SITE } from '../config/site'
@@ -49,8 +49,8 @@ export default function Cadastro() {
   const [cooldown, startCooldown] = useCooldown()
   const [captcha, setCaptcha] = useState<string | null>(null)
   const [captchaReset, setCaptchaReset] = useState(0)
-  const [open, setOpen] = useState<boolean | null>(null) // pré-cadastro aberto?
-  const [vmode, setVmode] = useState<'admin' | 'sms'>('admin') // como o celular é verificado
+  const [open, setOpen] = useState<boolean | null>(() => peekStatus()?.preRegistrationOpen ?? null) // pré-cadastro aberto?
+  const [vmode, setVmode] = useState<'admin' | 'sms'>(() => peekStatus()?.verificationMode ?? 'admin') // como o celular é verificado
   const [captchaMode, setCaptchaMode] = useState<CaptchaMode>(null)
   const [hp, setHp] = useState('') // campo-isca anti-robô (pessoas nunca veem)
 
@@ -82,7 +82,7 @@ export default function Cadastro() {
     if (Object.keys(next).length) return
     setBusy(true)
     try {
-      const r = await api.post<Registered | { ok: true; mode: 'admin' }>('/auth/register', { phone, password, acceptTerms: true, captchaToken: captcha, website: hp })
+      const r = await api.post<Registered | { ok: true; mode: 'admin' }>('/auth/register', { phone, password, acceptTerms: true, captchaToken: captcha, contato_extra: hp })
       if ('mode' in r) { // MVP: conta criada e já logada; o celular será verificado pela equipe
         await refresh()
         navigate('/profissional', { replace: true })
@@ -115,7 +115,7 @@ export default function Cadastro() {
       // Mesmo event_name + event_id do servidor => a Meta conta UMA conversão (deduplicação).
       if (consent && r.tracking) trackBrowserEvent(r.tracking.eventName, { content_name: 'pre_cadastro' }, r.tracking.eventId)
       await refresh()
-      navigate('/conta', { replace: true })
+      navigate('/area', { replace: true })
     } catch (err) {
       fail(err, 'code')
     } finally {
@@ -191,11 +191,18 @@ export default function Cadastro() {
       eyebrow="Pré-cadastro gratuito"
       title="Crie sua conta"
       subtitle={vmode === 'admin'
-        ? <>Só precisamos do seu celular e de uma senha. Sua conta é criada na hora e o celular é verificado depois pela nossa equipe. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>
+        ? <>Só precisamos do seu celular e de uma senha. Sua conta é criada na hora, o celular é verificado depois pela nossa equipe e seu perfil fica em análise até a aprovação. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>
         : <>Só precisamos do seu celular e de uma senha. Não pedimos e-mail. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>}
       below={<>Já tem conta? <Link to="/entrar" className={standaloneLink}>Entrar</Link></>}
     >
       <form onSubmit={submitForm} noValidate className="space-y-5">
+        <div data-testid="signup-steps" aria-label="Passos do cadastro">
+          <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Passo 1 de 4 · Crie sua conta</p>
+          <div className="mt-2 grid grid-cols-4 gap-1.5" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => <span key={i} className={`h-1.5 rounded-full ${i === 0 ? 'bg-graphite' : 'bg-line'}`} />)}
+          </div>
+          <p className="mt-2 text-[14px] leading-snug text-muted">Depois você escolhe até 2 profissões e 2 regiões, conta sua experiência e responde a 3 perguntas rápidas por profissão.</p>
+        </div>
         {errors.form && (
           <Alert tone="error">
             {errors.form}{' '}
@@ -231,7 +238,7 @@ export default function Cadastro() {
         </div>
 
         <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
-          <label>Não preencha este campo<input type="text" name="website" tabIndex={-1} autoComplete="off" value={hp} onChange={(e) => setHp(e.target.value)} /></label>
+          <label>Não preencha este campo<input type="text" name="contato_extra" tabIndex={-1} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-lpignore="true" data-1p-ignore="true" value={hp} onChange={(e) => setHp(e.target.value)} /></label>
         </div>
         <CaptchaField onToken={setCaptcha} onMode={setCaptchaMode} resetSignal={captchaReset} error={errors.captcha} />
         <SubmitButton type="submit" loading={busy}>{vmode === 'admin' ? 'Criar minha conta' : 'Continuar'}</SubmitButton>

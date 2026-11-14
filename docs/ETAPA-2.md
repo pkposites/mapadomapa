@@ -10,7 +10,7 @@ Status: **desenvolvido e testado somente em ambiente local.** Nada foi publicado
 | Cadastro | Celular brasileiro + senha, confirmação por código SMS temporário, sem e-mail, proteção contra duplicidade |
 | Login e recuperação | Celular + senha; recuperação por código SMS; sessões em cookie HttpOnly; bloqueio de tentativas abusivas |
 | Anti-robô | CAPTCHA nas rotas que enviam SMS (cadastro, reenvio, recuperação): simulado no local, Cloudflare Turnstile pronto para produção |
-| Pré-cadastro | Controlado por `PRE_REGISTRATION_OPEN` (produção nasce **fechado**) — **diferente** da abertura dos *pedidos* (25/12/2026) |
+| Pré-cadastro | Controlado por `PRE_REGISTRATION_OPEN` (produção nasce **fechado**) — **diferente** da abertura dos *pedidos* (25/11/2026) |
 | Interface | `/cadastro`, `/entrar`, `/recuperar-senha`, `/conta` (privada), `/admin` (guarda de permissão) |
 | Administração | Só a base: papel `admin`, guarda separada, sessão de admin ≤ 8 h, auditoria. **Sem painel.** |
 | Meta Ads | Meta Pixel (navegador) + Conversions API (servidor), deduplicação por `event_name` + `event_id`, consentimento, GPC/DNT |
@@ -63,7 +63,7 @@ Código SMS: 10 min, 5 tentativas, uso único; reenvio 1/min (máx. 5/h). 5 erro
 
 ## 6. Pré-cadastro × abertura dos pedidos
 - **Pré-cadastro:** quando criar contas é permitido. Servidor: `PRE_REGISTRATION_OPEN` (local aberto; produção fechado até `true`). Fechado, `/cadastro` mostra "abre em breve".
-- **Abertura dos pedidos (25/12/2026):** quando clientes pedem orçamentos. É a data da contagem regressiva e dos textos da landing.
+- **Abertura dos pedidos (25/11/2026):** quando clientes pedem orçamentos. É a data da contagem regressiva e dos textos da landing.
 
 ## 7. Variáveis de ambiente (nomes e escopos; **nunca valores neste repositório**)
 

@@ -64,13 +64,25 @@ describe('Roteamento: /api nunca pode cair na página HTML', () => {
     return { from: f('from'), to: f('to'), status: f('status'), force: f('force') }
   })
 
-  it('a regra /api/* existe, aponta para a função e vem ANTES do fallback /* (primeira que casa vence)', () => {
-    const api = rules.findIndex((r) => r.from === '/api/*')
-    const spa = rules.findIndex((r) => r.from === '/*')
-    expect(api).toBeGreaterThanOrEqual(0)
-    expect(spa).toBeGreaterThanOrEqual(0)
-    expect(api).toBeLessThan(spa)
-    expect(rules[api]).toMatchObject({ to: '/.netlify/functions/api/:splat', status: '200', force: 'true' })
+  it('a regra /api/* existe e é forçada para a função; não há regra catch-all "/*" (404 de verdade)', () => {
+    const api = rules.find((r) => r.from === '/api/*')
+    expect(api).toMatchObject({ to: '/.netlify/functions/api/:splat', status: '200', force: 'true' })
+    expect(rules.find((r) => r.from === '/*')).toBeUndefined()
+  })
+
+  it('rotas do app em public/_redirects (200), sem catch-all, com 404.html; toda rota do App.tsx está listada', () => {
+    const lines = readFileSync('./public/_redirects', 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
+    const from = lines.map((l) => l.split(/\s+/)[0])
+    expect(from).not.toContain('/*')
+    for (const l of lines) expect(l.split(/\s+/).slice(1)).toEqual(['/index.html', '200'])
+    expect(readFileSync('./public/404.html', 'utf8')).toContain('Página não encontrada')
+    const app = readFileSync('./src/App.tsx', 'utf8')
+    const paths = [...app.matchAll(/<Route path="(\/[^"*]*)"/g)].map((m) => m[1]).concat(['/cadastro', '/privacidade', '/termos'])
+    for (const p of new Set(paths)) {
+      if (p === '/') continue
+      const top = '/' + p.split('/')[1]
+      expect(from.includes(p) || from.includes(top + '/*'), `rota ${p} fora de public/_redirects`).toBe(true)
+    }
   })
 
   it('a função existe no caminho que a regra usa', () => {

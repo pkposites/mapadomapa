@@ -80,7 +80,7 @@ export async function register(body: Body, ctx: Ctx) {
     throw new ApiError(400, 'terms_required', 'Para continuar, marque que você leu e aceita os Termos de Uso e a Política de Privacidade.')
   }
   // Campo-isca (honeypot): pessoas não veem nem preenchem; robôs costumam preencher.
-  if (typeof body.website === 'string' && body.website.trim() !== '') {
+  if (typeof body.contato_extra === 'string' && body.contato_extra.trim() !== '') {
     throw new ApiError(400, 'bad_request', 'Pedido inválido. Atualize a página e tente de novo.')
   }
   const bootstrap = verificationMode() === 'admin' && adminBootstrapPhones().includes(phone)

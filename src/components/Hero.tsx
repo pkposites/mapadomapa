@@ -10,7 +10,7 @@ export default function Hero() {
         <div>
           <span className="inline-flex h-8 items-center gap-2 rounded-full border border-white/15 px-3.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-on-dark">
             <span className="size-1.5 rounded-full bg-lime" aria-hidden="true" />
-            Pré-lançamento • São Paulo
+            Pré-cadastro aberto • São Paulo
           </span>
 
           <h1 className="mt-6 max-w-[13ch] text-balance text-[40px] font-bold leading-[1.04] tracking-[-0.03em] md:max-w-[16ch] md:text-6xl lg:text-[68px]">
@@ -18,13 +18,21 @@ export default function Hero() {
           </h1>
 
           <p className="mt-5 max-w-md text-[18px] leading-relaxed text-on-dark md:text-xl">
-            Cadastre-se gratuitamente e prepare-se para receber oportunidades de
-            serviços na sua região.
+            Pré-cadastro de profissionais aberto agora. Cadastre-se gratuitamente e
+            prepare-se para receber oportunidades de serviços na sua região.
           </p>
 
-          <div className="mt-8 flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-8">
+          <p className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-lime/15 px-4 py-2.5 text-[15px] font-semibold text-lime">
+            Pré-cadastro 100% gratuito para profissionais
+          </p>
+
+          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
             <Button id="hero-cta" to={SITE.signupPath} arrow fullWidth className="sm:w-auto">
               {SITE.ctaLabel}
+            </Button>
+
+            <Button to="/entrar" variant="outline" fullWidth className="sm:w-auto">
+              Já tenho cadastro — Entrar
             </Button>
 
             <div className="flex items-center gap-3">

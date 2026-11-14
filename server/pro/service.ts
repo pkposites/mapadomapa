@@ -153,8 +153,8 @@ export async function setProfessions(userId: string, body: Record<string, unknow
 }
 
 // ---------- Passo 2: regiões (máx. 2) ----------
-export async function setRegions(userId: string, body: Record<string, unknown>) {
-  await assertEditable(userId)
+export async function setRegions(userId: string, body: Record<string, unknown>, opts: { anyStatus?: boolean } = {}) {
+  if (!opts.anyStatus) await assertEditable(userId)
   const slugs = body.regions
   if (!Array.isArray(slugs) || slugs.some((s) => typeof s !== 'string') || new Set(slugs).size !== slugs.length) throw bad('invalid_regions', 'Escolha as regiões da lista.')
   if (slugs.length < 1) throw bad('regions_required', 'Escolha pelo menos 1 região.')
@@ -177,8 +177,8 @@ export async function setRegions(userId: string, body: Record<string, unknown>) 
 }
 
 // ---------- Passo 3: experiência, disponibilidade, ferramentas, veículo e estrutura ----------
-export async function setWork(userId: string, body: Record<string, unknown>) {
-  await assertEditable(userId)
+export async function setWork(userId: string, body: Record<string, unknown>, opts: { anyStatus?: boolean } = {}) {
+  if (!opts.anyStatus) await assertEditable(userId)
   const selected = await query<Row>('SELECT p.slug, p.id FROM profile_professions pp JOIN professions p ON p.id = pp.profession_id WHERE pp.user_id = $1', [userId])
   if (selected.length === 0) throw new ApiError(409, 'select_professions_first', 'Escolha suas profissões primeiro.')
 
@@ -268,8 +268,9 @@ export async function submit(userId: string, ip?: string) {
   for (const p of s.professions) {
     const idRow = (await query<Row>('SELECT id FROM professions WHERE slug = $1', [p.slug]))[0]
     const answers: AnswerMap = s.answers[p.slug] ?? {}
-    const openQ = (QUESTIONNAIRES[p.slug] ?? []).find((x) => x.kind === 'open')!
-    evals.push({ slug: p.slug, id: idRow.id, rule: ruleScore(p.slug, answers), ai: await evaluateOpenAnswer(p.slug, p.name, answers[openQ.id]?.text ?? '') })
+    const openQ = (QUESTIONNAIRES[p.slug] ?? []).find((x) => x.kind === 'open') // v2 não tem pergunta aberta
+    const ai: AiOutcome = openQ ? await evaluateOpenAnswer(p.slug, p.name, answers[openQ.id]?.text ?? '') : { status: 'off' }
+    evals.push({ slug: p.slug, id: idRow.id, rule: ruleScore(p.slug, answers), ai })
   }
 
   await withTransaction(async (c) => {
