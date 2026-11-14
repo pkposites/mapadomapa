@@ -1,7 +1,7 @@
 export const STEPS = [
   {
     title: 'Cadastre-se grátis',
-    text: 'Informe seus dados, escolha sua categoria e a região de São Paulo onde você atende.',
+    text: 'Informe seus dados, escolha até 2 profissões e a região de São Paulo onde você atende.',
   },
   {
     title: 'Receba pedidos no celular',

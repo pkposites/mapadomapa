@@ -5,7 +5,7 @@ import { SITE } from '../config/site'
 
 const ITEMS = [
   'Seu nome e um contato',
-  'A categoria do serviço que você oferece',
+  'Até 2 profissões que você oferece',
   'As regiões de São Paulo onde você atende',
 ]
 

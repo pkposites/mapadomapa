@@ -1,5 +1,5 @@
 import Reveal from './Reveal'
-import { CATEGORIES } from '../data/categories'
+import { CATEGORIES, MAX_PROFESSIONS } from '../data/categories'
 
 export default function Categories() {
   return (
@@ -10,11 +10,11 @@ export default function Categories() {
             Categorias
           </p>
           <h2 className="mt-3 max-w-[18ch] text-balance text-[28px] font-bold leading-[1.1] tracking-[-0.02em] md:text-[40px]">
-            Nove áreas profissionais, um só lugar
+            Sua profissão tem lugar aqui!
           </h2>
           <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-muted md:text-lg">
-            Escolha a sua categoria no cadastro e receba pedidos de quem procura
-            exatamente o seu serviço.
+            Escolha até {MAX_PROFESSIONS} profissões no cadastro e prepare-se para
+            receber oportunidades na sua região.
           </p>
         </Reveal>
 

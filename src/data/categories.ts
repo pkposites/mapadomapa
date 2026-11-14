@@ -1,32 +1,36 @@
 import {
-  Car,
-  GraduationCap,
-  Hammer,
-  HeartPulse,
-  Laptop,
-  PartyPopper,
-  Scissors,
+  Armchair,
+  Bug,
+  Droplets,
+  Drill,
+  KeyRound,
+  PaintRoller,
   Sparkles,
+  Truck,
   Zap,
   type LucideIcon,
 } from 'lucide-react'
 
 export type Category = {
+  /** Identificador estável (slug). Reutilizar no quiz e no banco de dados. */
   id: string
   name: string
   examples: string
   icon: LucideIcon
 }
 
-// Nomes provisórios das 9 categorias — edite aqui para ajustar a landing inteira.
+/** Máximo de profissões que o profissional pode escolher no cadastro. */
+export const MAX_PROFESSIONS = 2
+
+// Categorias aprovadas — fonte única para landing, futuro quiz e banco de dados.
 export const CATEGORIES: Category[] = [
-  { id: 'reformas', name: 'Reformas e obras', examples: 'Pedreiro, pintor, gesseiro', icon: Hammer },
-  { id: 'eletrica-hidraulica', name: 'Elétrica e hidráulica', examples: 'Eletricista, encanador', icon: Zap },
-  { id: 'limpeza', name: 'Limpeza e diaristas', examples: 'Faxina, pós-obra, limpeza pesada', icon: Sparkles },
-  { id: 'beleza', name: 'Beleza e estética', examples: 'Cabelo, unhas, maquiagem', icon: Scissors },
-  { id: 'saude', name: 'Saúde e bem-estar', examples: 'Massagem, personal, nutrição', icon: HeartPulse },
-  { id: 'aulas', name: 'Aulas e reforço', examples: 'Idiomas, música, reforço escolar', icon: GraduationCap },
-  { id: 'tecnologia', name: 'Tecnologia e design', examples: 'Suporte, sites, identidade visual', icon: Laptop },
-  { id: 'eventos', name: 'Eventos e festas', examples: 'Buffet, DJ, fotografia', icon: PartyPopper },
-  { id: 'automotivo', name: 'Automotivo', examples: 'Mecânica, funilaria, lava-rápido', icon: Car },
+  { id: 'encanadores', name: 'Encanadores', examples: 'Vazamentos, torneiras, desentupimento', icon: Droplets },
+  { id: 'eletricistas', name: 'Eletricistas', examples: 'Tomadas, chuveiros, quadros de luz', icon: Zap },
+  { id: 'instaladores', name: 'Instaladores', examples: 'Ar-condicionado, TV, prateleiras', icon: Drill },
+  { id: 'pintores', name: 'Pintores', examples: 'Casas, apartamentos, comércios', icon: PaintRoller },
+  { id: 'faxineiras', name: 'Faxineiras', examples: 'Faxina e limpeza', icon: Sparkles },
+  { id: 'montadores-de-moveis', name: 'Montadores de móveis', examples: 'Guarda-roupas, camas, estantes', icon: Armchair },
+  { id: 'dedetizacao', name: 'Dedetização', examples: 'Insetos, ratos, cupins', icon: Bug },
+  { id: 'guincho', name: 'Guincho', examples: 'Reboque de carros e motos', icon: Truck },
+  { id: 'chaveiros', name: 'Chaveiros', examples: 'Aberturas, cópias, troca de fechadura', icon: KeyRound },
 ]

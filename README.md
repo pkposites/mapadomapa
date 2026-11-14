@@ -17,7 +17,7 @@ npm run icons      # regenera os ícones PWA em public/
 
 ## Onde editar
 - `src/config/site.ts` — data de abertura, textos globais
-- `src/data/categories.ts` — as 9 categorias (nomes provisórios)
+- `src/data/categories.ts` — as 9 profissões aprovadas (usadas também no futuro quiz e banco de dados)
 - `src/data/steps.ts` — passos e benefícios
 - `src/index.css` — tokens de cor e tipografia da marca
 
