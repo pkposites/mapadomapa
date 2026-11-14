@@ -227,6 +227,41 @@ describe('Notificações push', () => {
   })
 })
 
+describe('Mural social', () => {
+  async function approvedUser(admin: Awaited<ReturnType<typeof mkUser>>, name: string) {
+    const u = await mkUser(); await u.call('PUT', '/pro/me', { fullName: name }); await submitted(u)
+    await api('POST', `/admin/professionals/${u.id}/decision`, { cookie: admin.cookie, body: { action: 'approve' } }); return u
+  }
+  it('curtir (alterna, sem duplicar), comentar, validar, excluir o próprio, moderação; em análise só vê', async () => {
+    const admin = await mkAdmin(), a = await approvedUser(admin, 'Ana Souza'), b = await approvedUser(admin, 'Bruno Dias'), pend = await mkUser()
+    await a.call('POST', '/pro/feed', { body: 'Dica: sempre teste a vedação antes de fechar o forro.' })
+    const id = (await b.call('GET', '/pro/feed')).body.items[0].id
+    expect((await b.call('PUT', `/pro/feed/${id}/like`, { liked: true })).body).toEqual({ likes: 1, liked: true })
+    expect((await b.call('PUT', `/pro/feed/${id}/like`, { liked: true })).body).toEqual({ likes: 1, liked: true }) // idempotente
+    expect((await a.call('PUT', `/pro/feed/${id}/like`, { liked: true })).body.likes).toBe(2)
+    expect((await b.call('GET', '/pro/feed')).body.items[0]).toMatchObject({ likes: 2, liked: true, comments: 0 })
+    expect((await b.call('PUT', `/pro/feed/${id}/like`, { liked: false })).body).toEqual({ likes: 1, liked: false })
+    expect((await pend.call('PUT', `/pro/feed/${id}/like`, { liked: true })).status).toBe(403)
+    expect((await pend.call('POST', `/pro/feed/${id}/comments`, { body: 'oi' })).status).toBe(403)
+    expect((await b.call('POST', `/pro/feed/${id}/comments`, { body: 'x' })).body.error.code).toBe('invalid_comment')
+    expect((await b.call('POST', `/pro/feed/${id}/comments`, { body: 'me liga 11 98888-7777' })).body.error.code).toBe('post_contact_info')
+    const c = await b.call('POST', `/pro/feed/${id}/comments`, { body: 'Verdade! Também uso o teste de pressão.' })
+    expect(c.body.items[0]).toMatchObject({ name: 'Bruno Dias', professions: ['Pintores'], mine: true })
+    expect(Object.keys(c.body.items[0]).sort()).toEqual(['at', 'body', 'id', 'mine', 'name', 'professions'])
+    const seen = (await pend.call('GET', `/pro/feed/${id}/comments`)).body.items // quem está em análise lê os comentários
+    expect(seen).toHaveLength(1); expect(seen[0].mine).toBe(false)
+    expect((await a.call('DELETE', `/pro/feed/comments/${seen[0].id}`)).status).toBe(404) // não apaga comentário alheio
+    expect((await b.call('GET', '/pro/feed')).body.items[0].comments).toBe(1)
+    expect((await api('GET', `/admin/feed/${id}/comments`, { cookie: admin.cookie })).body.items).toHaveLength(1)
+    expect((await a.call('GET', `/admin/feed/${id}/comments`)).status).toBe(403)
+    await api('PUT', `/admin/feed/comments/${seen[0].id}`, { cookie: admin.cookie, body: { hidden: true } })
+    expect((await b.call('GET', `/pro/feed/${id}/comments`)).body.items).toHaveLength(0)
+    const c2 = await b.call('POST', `/pro/feed/${id}/comments`, { body: 'Outro comentário meu' })
+    expect((await b.call('DELETE', `/pro/feed/comments/${c2.body.items[0].id}`)).status).toBe(200)
+    expect((await b.call('GET', '/pro/feed/999999/comments')).status).toBe(404)
+  })
+})
+
 describe('Mural', () => {
   async function approvedUser(admin: Awaited<ReturnType<typeof mkUser>>, name: string) {
     const u = await mkUser(); await u.call('PUT', '/pro/me', { fullName: name }); await submitted(u)
@@ -235,7 +270,7 @@ describe('Mural', () => {
   it('só aprovados leem/publicam; ninguém recebe id, celular ou perfil de outro; validações', async () => {
     const admin = await mkAdmin(), a = await approvedUser(admin, 'Ana Souza'), b = await approvedUser(admin, 'Bruno Dias'), pend = await mkUser()
     expect((await api('GET', '/pro/feed')).status).toBe(401)
-    expect((await pend.call('GET', '/pro/feed')).body).toMatchObject({ allowed: false, items: [] })
+    expect((await pend.call('GET', '/pro/feed')).body).toMatchObject({ allowed: true, canInteract: false, canPost: false, items: [] })
     expect((await pend.call('POST', '/pro/feed', { body: 'oi pessoal' })).status).toBe(403)
     expect((await a.call('POST', '/pro/feed', { body: 'oi' })).body.error.code).toBe('invalid_post')
     expect((await a.call('POST', '/pro/feed', { body: 'x'.repeat(601) })).body.error.code).toBe('post_too_long')
@@ -244,7 +279,8 @@ describe('Mural', () => {
     const seen = (await b.call('GET', '/pro/feed')).body
     expect(seen.items).toHaveLength(1)
     expect(seen.items[0]).toMatchObject({ name: 'Ana Souza', professions: ['Pintores'], body: 'Alguém indica um bom fornecedor de tinta na Zona Sul?', mine: false })
-    expect(Object.keys(seen.items[0]).sort()).toEqual(['at', 'body', 'id', 'mine', 'name', 'professions'])
+    expect(Object.keys(seen.items[0]).sort()).toEqual(['at', 'body', 'comments', 'id', 'liked', 'likes', 'mine', 'name', 'professions'])
+    expect((await pend.call('GET', '/pro/feed')).body.items).toHaveLength(1) // quem está em análise também VÊ o mural
     expect(JSON.stringify(seen)).not.toMatch(new RegExp(`${a.id}|\\+55|11 9`)) // nenhum id de usuário nem celular
     expect((await b.call('GET', `/pro/me`)).body.fullName).toBe('Bruno Dias') // não existe rota para ler perfil alheio
   })

@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { ClipboardList, House, MessageSquare, UserRound } from 'lucide-react'
+import { ClipboardList, House, MessageSquare, Newspaper, UserRound } from 'lucide-react'
 import Logo from '../components/Logo'
 import { api } from '../lib/api'
 
 const TABS = [
   { to: '/area', label: 'Início', Icon: House, end: true },
+  { to: '/area/mural', label: 'Mural', Icon: Newspaper, end: false },
   { to: '/area/perfil', label: 'Meu Perfil', Icon: UserRound, end: false },
   { to: '/area/mensagens', label: 'Mensagens', Icon: MessageSquare, end: false },
   { to: '/area/pedidos', label: 'Pedidos', Icon: ClipboardList, end: false },
@@ -30,10 +31,10 @@ export default function AreaShell({ children }: { children: ReactNode }) {
       </header>
       <main className="mx-auto max-w-lg px-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-6">{children}</main>
       <nav aria-label="Área do profissional" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
-        <ul className="mx-auto grid max-w-lg grid-cols-4">
+        <ul className="mx-auto grid max-w-lg grid-cols-5">
           {TABS.map(({ to, label, Icon, end }) => (
             <li key={to}>
-              <NavLink to={to} end={end} className={({ isActive }) => `relative flex min-h-16 flex-col items-center justify-center gap-1 text-[12px] font-semibold transition-colors ${isActive ? 'text-graphite' : 'text-muted'}`}>
+              <NavLink to={to} end={end} className={({ isActive }) => `relative flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold transition-colors ${isActive ? 'text-graphite' : 'text-muted'}`}>
                 {({ isActive }) => (
                   <>
                     <span className={`grid h-7 w-12 place-items-center rounded-full ${isActive ? 'bg-lime' : ''}`}><Icon size={22} strokeWidth={isActive ? 2.25 : 1.75} aria-hidden="true" /></span>

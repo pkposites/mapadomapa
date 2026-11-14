@@ -4,6 +4,7 @@ import Landing from './pages/Landing'
 import Entrar from './pages/Entrar'
 import Inicio from './pages/area/Inicio'
 import Perfil from './pages/area/Perfil'
+import MuralPage from './pages/area/MuralPage'
 import Mensagens from './pages/area/Mensagens'
 import Pedidos from './pages/area/Pedidos'
 import Admin from './pages/Admin'
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/entrar" element={<Entrar />} />
         <Route path="/conta" element={<Navigate to="/area" replace />} />
         <Route path="/area" element={<RequireAuth><Inicio /></RequireAuth>} />
+        <Route path="/area/mural" element={<RequireAuth><MuralPage /></RequireAuth>} />
         <Route path="/area/perfil" element={<RequireAuth><Perfil /></RequireAuth>} />
         <Route path="/area/mensagens" element={<RequireAuth><Mensagens /></RequireAuth>} />
         <Route path="/area/pedidos" element={<RequireAuth><Pedidos /></RequireAuth>} />

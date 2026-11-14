@@ -77,7 +77,7 @@ export default function Inicio() {
             )
           })}
 
-          <Mural />
+          <Mural compact />
 
           <div className="grid grid-cols-3 gap-3">
             {[
