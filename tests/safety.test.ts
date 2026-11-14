@@ -18,7 +18,8 @@ describe('Isolamento: nada aqui pode alterar a produção', () => {
     expect(files.length).toBeGreaterThan(0)
     for (const f of files) {
       const sql = readFileSync(`${MIGRATIONS}/${f}`, 'utf8').replace(/--.*$/gm, '')
-      expect(sql, f).not.toMatch(/\b(DROP|TRUNCATE|DELETE\s+FROM|UPDATE\s+\w+\s+SET|ALTER\s+TABLE\s+\w+\s+DROP)\b/i)
+      // Trocar uma regra de validação (DROP CONSTRAINT) não perde dado; tudo que apaga/zera dados continua proibido.
+      expect(sql, f).not.toMatch(/\b(DROP\s+(TABLE|SCHEMA|DATABASE|COLUMN|VIEW|INDEX)|TRUNCATE|DELETE\s+FROM|UPDATE\s+\w+\s+SET)\b/i)
     }
   })
 

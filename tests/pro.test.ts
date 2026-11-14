@@ -71,6 +71,15 @@ describe('Limites: máx. 2 profissões e 2 regiões', () => {
     await Promise.allSettled(rs.map((r) => query('INSERT INTO professional_regions (user_id, region_id) VALUES ($1,$2)', [id, r.id])))
     expect((await query('SELECT 1 FROM professional_regions WHERE user_id = $1', [id])).length).toBe(2)
   })
+  it('REGRESSÃO: reenviar a MESMA seleção (voltar ao passo e continuar) funciona', async () => {
+    const { call } = await logged()
+    for (let i = 0; i < 2; i++) {
+      expect((await call('PUT', '/pro/professions', { professions: ['pintores', 'guincho'] })).status).toBe(200)
+      expect((await call('PUT', '/pro/regions', { regions: ['centro', 'zona-sul'] })).status).toBe(200)
+    }
+    const s = (await call('GET', '/pro/profile')).body
+    expect(s.professions).toHaveLength(2); expect(s.regions).toHaveLength(2)
+  })
   it('trocar de profissão remove respostas e pontuação da que saiu', async () => {
     const { call, id } = await logged()
     await fillAll(call, ['pintores', 'guincho'])
