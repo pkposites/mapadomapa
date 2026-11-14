@@ -15,10 +15,10 @@ export default function LaunchCta() {
             <div>
               <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-lime">
                 <CalendarDays size={18} strokeWidth={2} aria-hidden="true" />
-                Abertura prevista
+                Abertura dos pedidos
               </p>
               <p className="mt-4 text-[length:min(56px,calc((100vw-96px)/5.4))] font-bold leading-none tracking-[-0.04em] md:text-[80px] lg:text-[88px]">
-                {SITE.launchLabel}
+                {SITE.requestsOpenLabel}
               </p>
               <p className="mt-3 text-[18px] text-on-dark" data-testid="countdown">
                 {launch.status === 'upcoming' && (
@@ -27,18 +27,18 @@ export default function LaunchCta() {
                     <strong className="font-semibold text-white">
                       {launch.days} {launch.days === 1 ? 'dia' : 'dias'}
                     </strong>{' '}
-                    para a abertura.
+                    para a abertura dos pedidos.
                   </>
                 )}
                 {launch.status === 'today' && (
-                  <strong className="font-semibold text-white">A abertura é hoje!</strong>
+                  <strong className="font-semibold text-white">Os pedidos abrem hoje!</strong>
                 )}
                 {launch.status === 'open' && (
-                  <strong className="font-semibold text-white">A plataforma já abriu!</strong>
+                  <strong className="font-semibold text-white">Os pedidos já estão abertos!</strong>
                 )}
               </p>
               <p className="mt-6 max-w-md text-[17px] leading-relaxed text-on-dark md:text-lg">
-                Cadastre-se agora e saia na frente quando a plataforma abrir em{' '}
+                O pré-cadastro é gratuito: cadastre-se agora e saia na frente quando os pedidos de orçamento começarem em{' '}
                 {SITE.city}.
               </p>
             </div>
@@ -48,7 +48,7 @@ export default function LaunchCta() {
                 {SITE.ctaLabel}
               </Button>
               <p className="mt-3 text-[14px] text-on-dark">
-                Gratuito. Sem compromisso.
+                Pré-cadastro gratuito. Sem compromisso.
               </p>
             </div>
           </div>

@@ -9,12 +9,7 @@ export function env(name: string): string | undefined {
  * o simulador de SMS e as rotas /api/dev/*. Em produção e em deploy previews é falso.
  */
 export function isDevEnvironment(): boolean {
-  return (
-    env('CONTEXT') === 'dev' ||
-    env('NETLIFY_DEV') === 'true' ||
-    process.env.VITEST === 'true' ||
-    process.env.NODE_ENV === 'test'
-  )
+  return env('CONTEXT') === 'dev' || env('NETLIFY_DEV') === 'true' || process.env.VITEST === 'true'
 }
 
 const DEV_SECRET = 'dev-only-secret-never-use-in-production'
@@ -44,3 +39,25 @@ export const POLICY = {
   passwordMin: 8,
   passwordMax: 128,
 } as const
+
+/**
+ * Pré-cadastro (criação de contas) aberto?
+ * Local: aberto. Produção: FECHADO por padrão — só abre com PRE_REGISTRATION_OPEN=true.
+ * (Diferente da abertura dos PEDIDOS de orçamento, prevista para 25/12/2026.)
+ */
+export function isPreRegistrationOpen(): boolean {
+  const v = env('PRE_REGISTRATION_OPEN')
+  if (v === 'true') return true
+  if (v === 'false') return false
+  return isDevEnvironment()
+}
+
+/** Garante que uma URL de banco aponta para a MÁQUINA LOCAL (nunca produção). */
+export function isLocalDatabaseUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.replace(/^\[|\]$/g, '')
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+  } catch {
+    return false
+  }
+}

@@ -23,6 +23,8 @@ function keepDevServerAlive() {
 export default defineConfig(({ command }) => {
   if (command === 'serve') keepDevServerAlive()
   return {
+  // O banco local (.netlify/db) grava arquivos o tempo todo; vigiá-los deixava o servidor a >100% de CPU.
+  server: { watch: { ignored: ['**/.netlify/**', '**/dist/**', '**/e2e/**', '**/tests/**', '**/docs/**', '**/brand/**'] } },
   plugins: [
     // Emula Functions + banco local. Edge Functions desligadas (o projeto não usa; evita depender do Deno).
     netlify({ edgeFunctions: { enabled: false } }),
@@ -35,7 +37,7 @@ export default defineConfig(({ command }) => {
         name: 'Mapa do Mapa',
         short_name: 'Mapa do Mapa',
         description:
-          'Receba pedidos de orçamento direto no seu celular. Pré-lançamento em São Paulo.',
+          'Receba pedidos de orçamento direto no seu celular. Pré-cadastro gratuito em São Paulo.',
         lang: 'pt-BR',
         start_url: '/',
         scope: '/',

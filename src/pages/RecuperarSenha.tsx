@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import AuthShell, { linkClass } from '../components/AuthShell'
+import AuthShell, { standaloneLink } from '../components/AuthShell'
+import CaptchaField, { captchaEnabled } from '../components/ui/CaptchaField'
 import Alert from '../components/ui/Alert'
 import { CodeField, PasswordField, PhoneField } from '../components/ui/Field'
 import SubmitButton from '../components/ui/SubmitButton'
@@ -8,9 +9,10 @@ import { api, ApiError } from '../lib/api'
 import { isPhoneComplete } from '../lib/phone'
 import { mmss, useCooldown } from '../hooks/useCooldown'
 
-type Errors = Partial<Record<'phone' | 'code' | 'password' | 'form', string>>
+type Errors = Partial<Record<'phone' | 'code' | 'password' | 'captcha' | 'form', string>>
 const FIELD_OF: Record<string, keyof Errors> = {
   invalid_phone: 'phone', weak_password: 'password', code_invalid: 'code', code_expired: 'code', code_locked: 'code',
+  captcha_required: 'captcha', captcha_failed: 'captcha',
 }
 
 export default function RecuperarSenha() {
@@ -22,6 +24,8 @@ export default function RecuperarSenha() {
   const [errors, setErrors] = useState<Errors>({})
   const [busy, setBusy] = useState(false)
   const [cooldown, startCooldown] = useCooldown()
+  const [captcha, setCaptcha] = useState<string | null>(null)
+  const [captchaReset, setCaptchaReset] = useState(0)
 
   const fail = (err: unknown) => {
     const e = err instanceof ApiError ? err : null
@@ -31,15 +35,18 @@ export default function RecuperarSenha() {
   const sendCode = async (ev?: FormEvent) => {
     ev?.preventDefault()
     if (!isPhoneComplete(phone)) return setErrors({ phone: 'Digite o celular com DDD. Exemplo: (11) 91234-5678.' })
+    if (captchaEnabled && !captcha) return setErrors({ captcha: 'Confirme que você não é um robô para continuar.' })
     setBusy(true)
     setErrors({})
     try {
-      const r = await api.post<{ resendIn: number }>('/auth/forgot-password', { phone })
+      const r = await api.post<{ resendIn: number }>('/auth/forgot-password', { phone, captchaToken: captcha })
       startCooldown(r.resendIn)
       setStep('reset')
     } catch (err) {
       fail(err)
     } finally {
+      setCaptcha(null)
+      setCaptchaReset((n) => n + 1) // o token é de uso único
       setBusy(false)
     }
   }
@@ -68,16 +75,21 @@ export default function RecuperarSenha() {
         eyebrow="Recuperar acesso"
         title="Crie uma nova senha"
         subtitle={<>Se <strong className="font-semibold text-graphite">{phone}</strong> tiver cadastro, enviamos um SMS com 6 números. O código vale por 10 minutos.</>}
-        below={<button type="button" className={linkClass} onClick={() => { setStep('phone'); setErrors({}); setCode('') }}>Trocar o número do celular</button>}
+        below={<button type="button" className={standaloneLink} onClick={() => { setStep('phone'); setErrors({}); setCode('') }}>Trocar o número do celular</button>}
       >
         <form onSubmit={reset} noValidate className="space-y-5">
           {errors.form && <Alert tone="error">{errors.form}</Alert>}
           <CodeField id="code" label="Código do SMS" value={code} onChange={setCode} error={errors.code} autoFocus />
           <PasswordField id="password" label="Nova senha" hint="Pelo menos 8 caracteres." value={password} onChange={setPassword} error={errors.password} autoComplete="new-password" />
           <SubmitButton type="submit" loading={busy}>Salvar nova senha</SubmitButton>
-          <SubmitButton type="button" variant="ghost" disabled={busy || cooldown > 0} onClick={() => sendCode()}>
-            {cooldown > 0 ? `Reenviar código em ${mmss(cooldown)}` : 'Não recebi o código. Reenviar'}
-          </SubmitButton>
+          {cooldown > 0 ? (
+            <SubmitButton type="button" variant="ghost" disabled>Reenviar código em {mmss(cooldown)}</SubmitButton>
+          ) : (
+            <>
+              <CaptchaField onToken={setCaptcha} resetSignal={captchaReset} error={errors.captcha} />
+              <SubmitButton type="button" variant="ghost" disabled={busy} onClick={() => sendCode()}>Não recebi o código. Reenviar</SubmitButton>
+            </>
+          )}
         </form>
       </AuthShell>
     )
@@ -88,11 +100,12 @@ export default function RecuperarSenha() {
       eyebrow="Recuperar acesso"
       title="Esqueceu a senha?"
       subtitle="Digite seu celular. Vamos enviar um código por SMS para você criar uma nova senha."
-      below={<Link to="/entrar" className={linkClass}>Voltar para o login</Link>}
+      below={<Link to="/entrar" className={standaloneLink}>Voltar para o login</Link>}
     >
       <form onSubmit={sendCode} noValidate className="space-y-5">
         {errors.form && <Alert tone="error">{errors.form}</Alert>}
         <PhoneField id="phone" label="Seu celular" value={phone} onChange={setPhone} error={errors.phone} autoFocus />
+        <CaptchaField onToken={setCaptcha} resetSignal={captchaReset} error={errors.captcha} />
         <SubmitButton type="submit" loading={busy}>Enviar código</SubmitButton>
       </form>
     </AuthShell>

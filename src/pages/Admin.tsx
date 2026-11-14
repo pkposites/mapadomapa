@@ -53,7 +53,7 @@ export default function Admin() {
       <AuthShell eyebrow="Segurança" title="Entre novamente para continuar">
         <div className="space-y-5">
           <Alert tone="info">Por segurança, a área administrativa pede um novo login a cada 8 horas.</Alert>
-          <SubmitButton onClick={async () => { await logout(); navigate('/entrar', { state: { from: '/admin' } }) }}>
+          <SubmitButton onClick={async () => { await logout().catch(() => undefined); navigate('/entrar', { state: { from: '/admin' } }) }}>
             Entrar de novo
           </SubmitButton>
         </div>

@@ -1,17 +1,22 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import AuthShell, { linkClass } from '../components/AuthShell'
-import Alert from '../components/ui/Alert'
 import { AlertCircle } from 'lucide-react'
+import AuthShell, { linkClass, standaloneLink } from '../components/AuthShell'
+import Alert from '../components/ui/Alert'
+import CaptchaField, { captchaEnabled } from '../components/ui/CaptchaField'
 import { CodeField, PasswordField, PhoneField } from '../components/ui/Field'
 import SubmitButton from '../components/ui/SubmitButton'
+import Button from '../components/Button'
+import Spinner from '../components/ui/Spinner'
 import { useAuth } from '../auth/AuthContext'
 import { api, ApiError } from '../lib/api'
 import { isPhoneComplete } from '../lib/phone'
 import { mmss, useCooldown } from '../hooks/useCooldown'
 import { SITE } from '../config/site'
+import { readConsent } from '../lib/consent'
+import { readMetaCookies, trackBrowserEvent } from '../lib/meta'
 
-type Errors = Partial<Record<'phone' | 'password' | 'terms' | 'code' | 'form', string>>
+type Errors = Partial<Record<'phone' | 'password' | 'terms' | 'code' | 'captcha' | 'form', string>>
 type Registered = { phone: string; resendIn: number; expiresIn: number }
 
 const FIELD_OF: Record<string, keyof Errors> = {
@@ -21,7 +26,10 @@ const FIELD_OF: Record<string, keyof Errors> = {
   code_invalid: 'code',
   code_expired: 'code',
   code_locked: 'code',
+  captcha_required: 'captcha',
+  captcha_failed: 'captcha',
 }
+const CAPTCHA_MSG = 'Confirme que você não é um robô para continuar.'
 
 export default function Cadastro() {
   const navigate = useNavigate()
@@ -38,15 +46,25 @@ export default function Cadastro() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [cooldown, startCooldown] = useCooldown()
+  const [captcha, setCaptcha] = useState<string | null>(null)
+  const [captchaReset, setCaptchaReset] = useState(0)
+  const [open, setOpen] = useState<boolean | null>(null) // pré-cadastro aberto?
+
   useEffect(() => {
     if (state.resendIn) startCooldown(state.resendIn) // veio do login: respeita o intervalo do último SMS
+    api.get<{ preRegistrationOpen: boolean }>('/status').then((s) => setOpen(s.preRegistrationOpen)).catch(() => setOpen(true))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fail = (err: unknown, fallbackField: keyof Errors = 'form') => {
     const e = err instanceof ApiError ? err : null
+    if (e?.code === 'preregistration_closed') return setOpen(false)
     const field = e ? FIELD_OF[e.code] ?? fallbackField : 'form'
     setErrors({ [field]: e?.message ?? 'Algo deu errado. Tente de novo em instantes.' })
+  }
+  const newCaptcha = () => {
+    setCaptcha(null)
+    setCaptchaReset((n) => n + 1) // o token é de uso único
   }
 
   const submitForm = async (ev: FormEvent) => {
@@ -55,17 +73,19 @@ export default function Cadastro() {
     if (!isPhoneComplete(phone)) next.phone = 'Digite o celular com DDD. Exemplo: (11) 91234-5678.'
     if (password.length < 8) next.password = 'Use pelo menos 8 caracteres na senha.'
     if (!accepted) next.terms = 'Marque que você leu e aceita para continuar.'
+    if (captchaEnabled && !captcha) next.captcha = CAPTCHA_MSG
     setErrors(next)
     if (Object.keys(next).length) return
     setBusy(true)
     try {
-      const r = await api.post<Registered>('/auth/register', { phone, password, acceptTerms: true })
+      const r = await api.post<Registered>('/auth/register', { phone, password, acceptTerms: true, captchaToken: captcha })
       startCooldown(r.resendIn)
       setNotice(null)
       setStep('code')
     } catch (err) {
       fail(err)
     } finally {
+      newCaptcha()
       setBusy(false)
     }
   }
@@ -76,7 +96,15 @@ export default function Cadastro() {
     setBusy(true)
     setErrors({})
     try {
-      await api.post('/auth/verify-phone', { phone, code })
+      const consent = readConsent() === 'granted'
+      const r = await api.post<{ tracking?: { eventName: string; eventId: string } }>('/auth/verify-phone', {
+        phone,
+        code,
+        trackingConsent: consent,
+        ...(consent ? readMetaCookies() : {}),
+      })
+      // Mesmo event_name + event_id do servidor => a Meta conta UMA conversão (deduplicação).
+      if (consent && r.tracking) trackBrowserEvent(r.tracking.eventName, { content_name: 'pre_cadastro' }, r.tracking.eventId)
       await refresh()
       navigate('/conta', { replace: true })
     } catch (err) {
@@ -87,10 +115,11 @@ export default function Cadastro() {
   }
 
   const resend = async () => {
+    if (captchaEnabled && !captcha) return setErrors({ captcha: CAPTCHA_MSG })
     setBusy(true)
     setErrors({})
     try {
-      const r = await api.post<{ resendIn: number }>('/auth/resend-code', { phone })
+      const r = await api.post<{ resendIn: number }>('/auth/resend-code', { phone, captchaToken: captcha })
       startCooldown(r.resendIn)
       setCode('')
       setNotice('Enviamos um novo código. Use o mais recente.')
@@ -98,8 +127,24 @@ export default function Cadastro() {
       if (err instanceof ApiError && typeof err.data.retryAfter === 'number') startCooldown(err.data.retryAfter)
       fail(err)
     } finally {
+      newCaptcha()
       setBusy(false)
     }
+  }
+
+  if (open === null && step === 'form') return <Spinner fullPage />
+
+  if (open === false && step === 'form') {
+    return (
+      <AuthShell
+        eyebrow="Pré-cadastro"
+        title="O pré-cadastro abre em breve"
+        subtitle={<>Os pedidos de orçamento começam em <strong className="font-semibold text-graphite">{SITE.requestsOpenLabel}</strong>. Volte logo para garantir o seu lugar.</>}
+        below={<>Já tem conta? <Link to="/entrar" className={standaloneLink}>Entrar</Link></>}
+      >
+        <Button to="/" variant="dark" fullWidth>Voltar para o início</Button>
+      </AuthShell>
+    )
   }
 
   if (step === 'code') {
@@ -109,7 +154,7 @@ export default function Cadastro() {
         title="Confirme seu celular"
         subtitle={<>Enviamos um SMS com 6 números para <strong className="font-semibold text-graphite">{phone}</strong>. O código vale por 10 minutos.</>}
         below={
-          <button type="button" onClick={() => { setStep('form'); setErrors({}); setCode(''); setNotice(null) }} className={linkClass}>
+          <button type="button" onClick={() => { setStep('form'); setErrors({}); setCode(''); setNotice(null) }} className={standaloneLink}>
             Trocar o número do celular
           </button>
         }
@@ -119,9 +164,14 @@ export default function Cadastro() {
           {errors.form && <Alert tone="error">{errors.form}</Alert>}
           <CodeField id="code" label="Código do SMS" value={code} onChange={setCode} error={errors.code} autoFocus />
           <SubmitButton type="submit" loading={busy}>Confirmar celular</SubmitButton>
-          <SubmitButton type="button" variant="ghost" disabled={busy || cooldown > 0} onClick={resend}>
-            {cooldown > 0 ? `Reenviar código em ${mmss(cooldown)}` : 'Não recebi o código. Reenviar'}
-          </SubmitButton>
+          {cooldown > 0 ? (
+            <SubmitButton type="button" variant="ghost" disabled>Reenviar código em {mmss(cooldown)}</SubmitButton>
+          ) : (
+            <>
+              <CaptchaField onToken={setCaptcha} resetSignal={captchaReset} error={errors.captcha} />
+              <SubmitButton type="button" variant="ghost" disabled={busy} onClick={resend}>Não recebi o código. Reenviar</SubmitButton>
+            </>
+          )}
         </form>
       </AuthShell>
     )
@@ -129,10 +179,10 @@ export default function Cadastro() {
 
   return (
     <AuthShell
-      eyebrow="Cadastro gratuito"
+      eyebrow="Pré-cadastro gratuito"
       title="Crie sua conta"
-      subtitle="Só precisamos do seu celular e de uma senha. Não pedimos e-mail."
-      below={<>Já tem conta? <Link to="/entrar" className={linkClass}>Entrar</Link></>}
+      subtitle={<>Só precisamos do seu celular e de uma senha. Não pedimos e-mail. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>}
+      below={<>Já tem conta? <Link to="/entrar" className={standaloneLink}>Entrar</Link></>}
     >
       <form onSubmit={submitForm} noValidate className="space-y-5">
         {errors.form && (
@@ -169,6 +219,7 @@ export default function Cadastro() {
           )}
         </div>
 
+        <CaptchaField onToken={setCaptcha} resetSignal={captchaReset} error={errors.captcha} />
         <SubmitButton type="submit" loading={busy}>Continuar</SubmitButton>
       </form>
     </AuthShell>

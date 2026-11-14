@@ -39,7 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
-    await api.post('/auth/logout').catch(() => undefined)
+    // Se o servidor não confirmar, NÃO fingimos que saiu: a sessão continuaria válida lá.
+    // O erro sobe para a tela mostrar uma mensagem e permitir tentar de novo.
+    await api.post('/auth/logout')
     hint.set(false)
     setUser(null)
   }, [])

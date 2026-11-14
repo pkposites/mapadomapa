@@ -30,6 +30,14 @@ const SECTIONS: LegalSection[] = [
     pending: 'Base legal de cada finalidade e eventual necessidade de consentimento específico.',
   },
   {
+    title: 'Cookies e mensuração de anúncios (Meta)',
+    body: [
+      'Se você permitir, usamos o Meta Pixel (no navegador) e a Conversions API (no servidor) para medir se os anúncios do Mapa do Mapa funcionam. Quando você confirma o cadastro, podemos enviar à Meta o evento "cadastro concluído" com seu telefone protegido por criptografia irreversível (hash), nunca em texto aberto.',
+      'Nada disso é ativado sem a sua autorização. Você pode recusar, mudar de ideia a qualquer momento em "Preferências de privacidade", no rodapé, e o sinal de privacidade do navegador (Global Privacy Control / Do Not Track) é respeitado.',
+    ],
+    pending: 'Base legal (consentimento), papéis de controlador/operador com a Meta, transferência internacional de dados, prazo de retenção e texto final de cookies.',
+  },
+  {
     title: 'Compartilhamento',
     body: [
       'Parte dos dados do profissional poderá ser exibida a clientes interessados em seus serviços, e operadores de tecnologia poderão tratar dados em nome da plataforma.',

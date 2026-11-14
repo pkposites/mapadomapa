@@ -15,6 +15,14 @@ beforeEach(async () => {
 /** Simula o ambiente de produção: nada de "dev" liberado. */
 async function inProduction<T>(fn: () => Promise<T>, extra: Record<string, string> = {}): Promise<T> {
   const saved = { ...process.env }
+  const realFetch = globalThis.fetch
+  // Para isolar a trava do SMS/segredo, as travas anteriores (pré-cadastro e CAPTCHA) são satisfeitas
+  // com a rede falsa; nenhuma chamada real à Cloudflare é feita.
+  globalThis.fetch = (async (u: any, i: any) =>
+    String(u).includes('challenges.cloudflare.com') ? Response.json({ success: true, hostname: 'example.com' }) : realFetch(u, i)) as typeof fetch
+  process.env.PRE_REGISTRATION_OPEN = 'true'
+  process.env.CAPTCHA_PROVIDER = 'turnstile'
+  process.env.TURNSTILE_SECRET_KEY = '1x0000000000000000000000000000000AA'
   process.env.VITEST = 'false'
   process.env.NODE_ENV = 'production'
   process.env.CONTEXT = 'production'
@@ -25,6 +33,7 @@ async function inProduction<T>(fn: () => Promise<T>, extra: Record<string, strin
   try {
     return await fn()
   } finally {
+    globalThis.fetch = realFetch
     for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
     Object.assign(process.env, saved)
   }

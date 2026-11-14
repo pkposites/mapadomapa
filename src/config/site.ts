@@ -1,9 +1,13 @@
 export const SITE = {
   name: 'Mapa do Mapa',
   city: 'São Paulo',
-  /** Abertura prevista da plataforma (00:00 no horário de Brasília). */
-  launchDate: new Date('2026-12-25T00:00:00-03:00'),
-  launchLabel: '25/12/2026',
+  /**
+   * Abertura dos PEDIDOS de orçamento (clientes pedindo, profissionais respondendo): 25/12/2026,
+   * 00:00 no horário de Brasília. NÃO é a abertura do pré-cadastro — esse é controlado pelo
+   * servidor (PRE_REGISTRATION_OPEN) e pode abrir antes.
+   */
+  requestsOpenDate: new Date('2026-12-25T00:00:00-03:00'),
+  requestsOpenLabel: '25/12/2026',
   signupPath: '/cadastro',
   ctaLabel: 'Quero me cadastrar',
   instagramUrl: 'https://www.instagram.com/mapadomapa/',
@@ -17,9 +21,9 @@ export type LaunchState =
   | { status: 'today' }
   | { status: 'open' }
 
-/** Estado da contagem regressiva em um instante (função pura, fácil de testar). */
+/** Estado da contagem regressiva até a abertura dos PEDIDOS (função pura, fácil de testar). */
 export function getLaunchState(now: Date = new Date()): LaunchState {
-  const diff = SITE.launchDate.getTime() - now.getTime()
+  const diff = SITE.requestsOpenDate.getTime() - now.getTime()
   if (diff > 0) return { status: 'upcoming', days: Math.ceil(diff / 86_400_000) }
   return diff > -86_400_000 ? { status: 'today' } : { status: 'open' }
 }

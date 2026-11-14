@@ -6,6 +6,8 @@ import RecuperarSenha from './pages/RecuperarSenha'
 import Conta from './pages/Conta'
 import Admin from './pages/Admin'
 import DevSmsPanel from './components/DevSmsPanel'
+import ConsentBanner from './components/ConsentBanner'
+import MetaRouteTracker from './components/MetaRouteTracker'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/guards'
 import Cadastro from './pages/Cadastro'
@@ -27,6 +29,7 @@ export default function App() {
   return (
     <AuthProvider>
       <ScrollManager />
+      <MetaRouteTracker />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path={SITE.signupPath} element={<Cadastro />} />
@@ -38,6 +41,7 @@ export default function App() {
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <ConsentBanner />
       {import.meta.env.DEV && <DevSmsPanel />}
     </AuthProvider>
   )

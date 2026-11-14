@@ -4,3 +4,7 @@ dist
 .DS_Store
 dev-dist
 .netlify
+.env
+.env.*
+!.env.example
+!.env.development

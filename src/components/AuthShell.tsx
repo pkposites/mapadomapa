@@ -35,5 +35,8 @@ export default function AuthShell({
   )
 }
 
+/** Link no meio de uma frase. */
 export const linkClass =
   'font-semibold text-graphite underline decoration-lime decoration-2 underline-offset-4 transition-colors duration-150 hover:decoration-graphite'
+/** Link sozinho numa linha: área de toque de 44px. */
+export const standaloneLink = `${linkClass} inline-block py-3`

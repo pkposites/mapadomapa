@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import AuthShell, { linkClass } from '../components/AuthShell'
+import AuthShell, { standaloneLink } from '../components/AuthShell'
 import Alert from '../components/ui/Alert'
 import { PasswordField, PhoneField } from '../components/ui/Field'
 import SubmitButton from '../components/ui/SubmitButton'
@@ -46,7 +46,7 @@ export default function Entrar() {
       eyebrow="Acesso"
       title="Entrar na sua conta"
       subtitle="Use o celular e a senha que você criou."
-      below={<>Ainda não tem conta? <Link to="/cadastro" className={linkClass}>Cadastre-se grátis</Link></>}
+      below={<>Ainda não tem conta? <Link to="/cadastro" className={standaloneLink}>Faça o pré-cadastro grátis</Link></>}
     >
       <form onSubmit={submit} noValidate className="space-y-5">
         {state.notice && <Alert tone="success">{state.notice}</Alert>}
@@ -55,7 +55,7 @@ export default function Entrar() {
         <PasswordField id="password" label="Senha" value={password} onChange={setPassword} error={errors.password} />
         <SubmitButton type="submit" loading={busy}>Entrar</SubmitButton>
         <p className="text-center text-[15px]">
-          <Link to="/recuperar-senha" className={linkClass}>Esqueci minha senha</Link>
+          <Link to="/recuperar-senha" className={standaloneLink}>Esqueci minha senha</Link>
         </p>
       </form>
     </AuthShell>

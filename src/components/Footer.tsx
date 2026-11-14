@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import Logo from './Logo'
 import { SITE } from '../config/site'
+import { openPreferences } from '../lib/consent'
+import { metaConfigured } from '../lib/meta'
 
 function InstagramIcon() {
   // Lucide não inclui ícones de marcas; contorno no mesmo estilo (traço 1.75).
@@ -31,7 +33,7 @@ export default function Footer() {
     <footer className="bg-graphite pb-28 text-on-dark md:pb-10">
       <div className="mx-auto max-w-6xl border-t border-white/10 px-5 pt-8 md:px-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-          <Link to="/" aria-label={`${SITE.name} — início`} className="self-start rounded-lg">
+          <Link to="/" aria-label={`${SITE.name} — início`} className="inline-flex min-h-11 items-center self-start rounded-lg">
             <Logo />
           </Link>
 
@@ -55,6 +57,11 @@ export default function Footer() {
             <Link to={SITE.termsPath} className={link}>
               Termos de Uso
             </Link>
+            {metaConfigured && (
+              <button type="button" onClick={openPreferences} className={`${link} text-left md:justify-end`}>
+                Preferências de privacidade
+              </button>
+            )}
           </nav>
         </div>
 

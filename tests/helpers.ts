@@ -13,12 +13,26 @@ export const PASSWORD = 'minha-senha-segura-42'
 let netlifyDb: NetlifyDB
 let currentDb: ReturnType<typeof getDatabase> | undefined
 
+/**
+ * TRAVA: a suíte APAGA o schema do banco informado em TEST_PG_URL. Por isso só aceita
+ * um banco da própria máquina cujo nome contenha "test" — nunca produção.
+ */
+export function assertSafeTestDatabase(url: string): void {
+  const u = new URL(url)
+  const local = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(u.hostname)
+  const name = u.pathname.replace(/^\//, '')
+  if (!local || !/test/i.test(name)) {
+    throw new Error(`TEST_PG_URL recusada: só bancos locais com "test" no nome (recebido host=${u.hostname}, banco=${name}).`)
+  }
+}
+
 /** Com TEST_PG_URL, a suíte roda num PostgreSQL real (concorrência de verdade). */
 export const usingRealPostgres = (): boolean => Boolean(process.env.TEST_PG_URL)
 
 export async function startDb(directory?: string): Promise<string> {
   if (process.env.TEST_PG_URL) {
     const url = process.env.TEST_PG_URL
+    assertSafeTestDatabase(url)
     const c = new pg.Client({ connectionString: url })
     await c.connect()
     await c.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;')
@@ -55,11 +69,16 @@ export async function cleanDb(): Promise<void> {
 export type Res = { status: number; body: any; cookie?: string; headers: Headers }
 
 let ipCounter = 0
+const SMS_ROUTES = ['/auth/register', '/auth/resend-code', '/auth/forgot-password']
+
 export async function api(
   method: string,
   path: string,
-  opts: { body?: unknown; cookie?: string; ip?: string; origin?: string; contentType?: string | null } = {},
+  opts: { body?: unknown; cookie?: string; ip?: string; origin?: string; contentType?: string | null; noCaptcha?: boolean } = {},
 ): Promise<Res> {
+  if (!opts.noCaptcha && SMS_ROUTES.includes(path) && opts.body && typeof opts.body === 'object' && !('captchaToken' in opts.body)) {
+    opts = { ...opts, body: { ...opts.body, captchaToken: 'dev-captcha-pass' } }
+  }
   const headers: Record<string, string> = { host: 'localhost:5173' }
   if (opts.body !== undefined && opts.contentType !== null) headers['content-type'] = opts.contentType ?? 'application/json'
   if (opts.cookie) headers.cookie = opts.cookie

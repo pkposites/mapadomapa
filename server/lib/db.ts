@@ -1,5 +1,5 @@
-import { getDatabase } from '@netlify/database'
-import { env, isDevEnvironment } from './env'
+import { getConnectionString, getDatabase } from '@netlify/database'
+import { env, isDevEnvironment, isLocalDatabaseUrl } from './env'
 
 type Db = ReturnType<typeof getDatabase>
 
@@ -16,7 +16,25 @@ interface PoolLike extends Queryable {
 
 // Um único cliente por instância (escopo de módulo), como recomenda a documentação.
 let db: Db | undefined
-export const getDb = (): Db => (db ??= getDatabase())
+export const getDb = (): Db => {
+  if (!db) {
+    // TRAVA: em ambiente local/testes só se aceita banco da própria máquina.
+    // Se alguém exportar a URL de produção por engano, o servidor recusa em vez de gravar nela.
+    if (isDevEnvironment()) {
+      let url: string | undefined
+      try {
+        url = getConnectionString()
+      } catch {
+        /* sem URL configurada: getDatabase() reporta o erro adequado */
+      }
+      if (url && !isLocalDatabaseUrl(url)) {
+        throw new Error('Ambiente local apontando para um banco que NÃO é local. Operação recusada para proteger a produção.')
+      }
+    }
+    db = getDatabase()
+  }
+  return db
+}
 /** Usado pelos testes para apontar para um banco em memória. */
 export const setDb = (next: Db | undefined): void => {
   db = next

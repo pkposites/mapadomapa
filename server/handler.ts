@@ -1,7 +1,7 @@
 import { audit } from './lib/audit'
 import { addSeconds, now } from './lib/clock'
 import { query } from './lib/db'
-import { isDevEnvironment } from './lib/env'
+import { isDevEnvironment, isPreRegistrationOpen } from './lib/env'
 import {
   ApiError, assertSameOrigin, clearSessionCookie, errorResponse, json, readCookie, readJson,
   SESSION_COOKIE, sessionCookie,
@@ -24,9 +24,17 @@ function withSession(req: Request, data: unknown, s: { token: string; maxAge: nu
 
 async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   const url = new URL(req.url)
-  const path = url.pathname.replace(/^\/api/, '').replace(/\/$/, '') || '/'
+  // Aceita /api/... (URL pública) e /.netlify/functions/api/... (destino do redirecionamento).
+  const path = url.pathname.replace(/^\/(?:\.netlify\/functions\/api|api)(?=\/|$)/, '').replace(/\/$/, '') || '/'
   const method = req.method.toUpperCase()
-  const ctx = { ip: apiCtx.ip, userAgent: req.headers.get('user-agent') }
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host')
+  const ctx = {
+    ip: apiCtx.ip,
+    userAgent: req.headers.get('user-agent'),
+    // Sinais de privacidade do navegador (Global Privacy Control / Do Not Track) = não rastrear.
+    optOut: req.headers.get('sec-gpc') === '1' || req.headers.get('dnt') === '1',
+    origin: host ? `${isHttps(req) ? 'https' : 'http'}://${host}` : undefined,
+  }
   const token = readCookie(req, SESSION_COOKIE)
 
   if (method !== 'GET' && method !== 'HEAD') assertSameOrigin(req)
@@ -48,12 +56,19 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
       await query('UPDATE verification_codes SET expires_at = $2 WHERE phone_e164 = $1 AND consumed_at IS NULL', [p.e164, addSeconds(now(), -1)])
       return json({ ok: true })
     }
+    if (method === 'GET' && path === '/dev/tracking') {
+      const rows = await query('SELECT event_name, event_id, mode, status, payload, created_at FROM tracking_events ORDER BY created_at DESC LIMIT 10')
+      return json({ events: rows })
+    }
     if (method === 'POST' && path === '/dev/reset-limits') {
       await query('DELETE FROM rate_limits')
       return json({ ok: true })
     }
     throw new ApiError(404, 'not_found', 'Não encontrado.')
   }
+
+  // ---------- Estado público (sem dados pessoais) ----------
+  if (method === 'GET' && path === '/status') return json({ preRegistrationOpen: isPreRegistrationOpen() })
 
   // ---------- Cadastro e login ----------
   if (method === 'POST' && path === '/auth/register') return json(await auth.register(await readJson(req), ctx))

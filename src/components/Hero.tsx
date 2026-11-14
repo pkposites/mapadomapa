@@ -32,8 +32,8 @@ export default function Hero() {
                 <CalendarDays size={22} strokeWidth={1.75} aria-hidden="true" />
               </span>
               <p className="leading-tight">
-                <span className="block text-[13px] text-on-dark">Abertura prevista</span>
-                <span className="block text-[18px] font-semibold">{SITE.launchLabel}</span>
+                <span className="block text-[13px] text-on-dark">Pedidos de orçamento abrem em</span>
+                <span className="block text-[18px] font-semibold">{SITE.requestsOpenLabel}</span>
               </p>
             </div>
           </div>

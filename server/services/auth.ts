@@ -1,6 +1,7 @@
 import { addSeconds, now } from '../lib/clock'
 import { isUniqueViolation, query, withTransaction } from '../lib/db'
-import { POLICY } from '../lib/env'
+import { isPreRegistrationOpen, POLICY } from '../lib/env'
+import { verifyCaptcha } from '../lib/captcha'
 import { ApiError } from '../lib/http'
 import { audit } from '../lib/audit'
 import { consumeCode, issueCode } from '../lib/codes'
@@ -9,8 +10,11 @@ import { formatNational, maskPhone, parseBrazilMobile } from '../lib/phone'
 import { enforce, hit, peek, reset, tooMany } from '../lib/rateLimit'
 import { createSession, revokeAllSessions, type SessionUser } from '../lib/sessions'
 import { getSmsProvider } from '../sms'
+import { randomUUID } from 'node:crypto'
+import { EVENT_COMPLETE_REGISTRATION, trackServerEvent } from '../lib/meta'
 
-export type Ctx = { ip?: string; userAgent?: string | null }
+/** optOut = o navegador enviou Sec-GPC/DNT: nunca rastrear. origin = endereço público do site. */
+export type Ctx = { ip?: string; userAgent?: string | null; optOut?: boolean; origin?: string }
 type Body = Record<string, unknown>
 
 const phoneOrThrow = (v: unknown): string => {
@@ -43,7 +47,11 @@ export async function register(body: Body, ctx: Ctx) {
   if (body.acceptTerms !== true) {
     throw new ApiError(400, 'terms_required', 'Para continuar, marque que você leu e aceita os Termos de Uso e a Política de Privacidade.')
   }
+  if (!isPreRegistrationOpen()) {
+    throw new ApiError(403, 'preregistration_closed', 'O pré-cadastro ainda não abriu. Volte em breve!')
+  }
   await enforce(`register:ip:${ctx.ip ?? 'unknown'}`, POLICY.registerPerIp.limit, POLICY.registerPerIp.windowSeconds)
+  await verifyCaptcha(body.captchaToken, ctx.ip)
 
   const existing = await findByPhone(phone)
   if (existing?.verified_at) throw phoneTaken()
@@ -92,13 +100,31 @@ export async function verifyPhone(body: Body, ctx: Ctx) {
     return { ...s, userId }
   })
   await audit('signup.completed', { userId: session.userId, ip: ctx.ip })
-  return { session, body: { ok: true } }
+
+  // Rastreamento Meta: SÓ com consentimento explícito e sem sinal de privacidade (GPC/DNT).
+  let tracking: { eventName: string; eventId: string } | undefined
+  if (body.trackingConsent === true && !ctx.optOut) {
+    tracking = { eventName: EVENT_COMPLETE_REGISTRATION, eventId: randomUUID() }
+    await trackServerEvent({
+      eventName: tracking.eventName,
+      eventId: tracking.eventId, // o navegador usa o MESMO id => a Meta deduplica
+      userId: session.userId,
+      phone,
+      ip: ctx.ip,
+      userAgent: ctx.userAgent,
+      sourceUrl: ctx.origin ? `${ctx.origin}/cadastro` : undefined,
+      fbp: body.fbp,
+      fbc: body.fbc,
+    })
+  }
+  return { session, body: { ok: true, ...(tracking ? { tracking } : {}) } }
 }
 
 /** Reenvia o código de confirmação do cadastro (somente para números ainda não confirmados). */
 export async function resendSignupCode(body: Body, ctx: Ctx) {
   const phone = phoneOrThrow(body.phone)
   await enforce(`resend:ip:${ctx.ip ?? 'unknown'}`, POLICY.recoveryPerIp.limit, POLICY.recoveryPerIp.windowSeconds)
+  await verifyCaptcha(body.captchaToken, ctx.ip)
   const found = await findByPhone(phone)
   if (found && !found.verified_at) await issueCode('signup', phone, ctx.ip)
   // Resposta igual para qualquer número: não revela quem tem cadastro.
@@ -152,6 +178,7 @@ export async function login(body: Body, ctx: Ctx) {
 export async function forgotPassword(body: Body, ctx: Ctx) {
   const phone = phoneOrThrow(body.phone)
   await enforce(`recovery:ip:${ctx.ip ?? 'unknown'}`, POLICY.recoveryPerIp.limit, POLICY.recoveryPerIp.windowSeconds)
+  await verifyCaptcha(body.captchaToken, ctx.ip)
   getSmsProvider() // falha igual para todos se o envio de SMS estiver indisponível
 
   const found = await findByPhone(phone)

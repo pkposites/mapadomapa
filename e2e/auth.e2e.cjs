@@ -23,11 +23,13 @@ const digits = (p) => p.replace(/\D/g, '')
 const resetLimits = (page) => page.request.post(`${B}/api/dev/reset-limits`, { data: {} })
 const bodyText = (page) => page.locator('body').innerText()
 
+const robot = (page) => page.getByLabel(/Não sou um robô/).check()
 async function overflow(page) { return page.evaluate(() => document.documentElement.scrollWidth - innerWidth) }
 
 ;(async () => {
   const browser = await chromium.launch()
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+  await ctx.addInitScript(() => localStorage.setItem('mdm_consent_v1', JSON.stringify({ marketing: false, at: 'teste' })))
   const page = await ctx.newPage()
   const errs = []
   page.on('pageerror', (e) => errs.push(String(e)))
@@ -46,7 +48,7 @@ async function overflow(page) { return page.evaluate(() => document.documentElem
 
   await page.getByRole('button', { name: 'Continuar' }).click()
   await page.waitForSelector('text=Digite o celular com DDD')
-  check('formulário vazio mostra erros claros', (await bodyText(page)).includes('pelo menos 8'))
+  check('formulário vazio mostra erros claros (inclui o CAPTCHA)', (await bodyText(page)).includes('pelo menos 8') && (await bodyText(page)).includes('não é um robô'))
   await shot('02-cadastro-erros')
 
   await page.getByLabel('Seu celular').fill(phone)
@@ -54,10 +56,17 @@ async function overflow(page) { return page.evaluate(() => document.documentElem
   await page.getByLabel('Crie uma senha').fill('12345678')
   await page.getByLabel(/Li e aceito/).check()
   await page.getByRole('button', { name: 'Continuar' }).click()
+  await page.waitForSelector('text=não é um robô')
+  const smsBefore = (await (await page.request.get(`${B}/api/dev/sms`)).json()).messages.length
+  check('sem marcar o CAPTCHA o cadastro não avança', (await page.locator('text=Confirme seu celular').count()) === 0)
+  await robot(page)
+  await page.getByRole('button', { name: 'Continuar' }).click()
   await page.waitForSelector('text=fácil de adivinhar')
+  check('nenhum SMS foi enviado com CAPTCHA ausente/senha fraca', (await (await page.request.get(`${B}/api/dev/sms`)).json()).messages.length === smsBefore)
   check('senha fraca é recusada com mensagem amigável', true)
 
   await page.getByLabel('Crie uma senha').fill(PASS)
+  await robot(page)
   await page.getByRole('button', { name: 'Continuar' }).click()
   await page.waitForSelector('text=Confirme seu celular')
   check('avança para a etapa do código', true)
@@ -89,6 +98,11 @@ async function overflow(page) { return page.evaluate(() => document.documentElem
   check('API admin recusa usuário comum (403)', apiAdmin.status() === 403, String(apiAdmin.status()))
 
   await page.goto(B + '/conta')
+  await page.route('**/api/auth/logout', (r) => r.abort())
+  await page.getByRole('button', { name: 'Sair da conta' }).click()
+  await page.waitForSelector('text=Não foi possível sair agora')
+  check('logout com falha de rede: avisa e NÃO finge que saiu (continua em /conta)', page.url().endsWith('/conta'))
+  await page.unroute('**/api/auth/logout')
   await page.getByRole('button', { name: 'Sair da conta' }).click()
   await page.waitForURL(B + '/')
   const anon = await ctx.newPage()
@@ -119,6 +133,7 @@ async function overflow(page) { return page.evaluate(() => document.documentElem
   await page.getByLabel('Seu celular').fill(phone)
   await page.getByLabel('Crie uma senha').fill('outra-senha-forte-1')
   await page.getByLabel(/Li e aceito/).check()
+  await robot(page)
   await page.getByRole('button', { name: 'Continuar' }).click()
   await page.waitForSelector('text=já tem cadastro')
   check('número repetido: mensagem clara com link para Entrar', (await page.getByRole('link', { name: 'Entrar' }).count()) > 0)
@@ -131,6 +146,7 @@ async function overflow(page) { return page.evaluate(() => document.documentElem
   await page.waitForURL('**/recuperar-senha')
   await shot('10-recuperar')
   await page.getByLabel('Seu celular').fill(phone)
+  await robot(page)
   await page.getByRole('button', { name: 'Enviar código' }).click()
   await page.waitForSelector('text=Crie uma nova senha')
   await shot('11-recuperar-codigo')
@@ -160,6 +176,7 @@ async function overflow(page) { return page.evaluate(() => document.documentElem
   await page.getByLabel('Seu celular').fill(phone2)
   await page.getByLabel('Crie uma senha').fill(PASS)
   await page.getByLabel(/Li e aceito/).check()
+  await robot(page)
   await page.getByRole('button', { name: 'Continuar' }).click()
   await page.waitForSelector('text=Confirme seu celular')
   const code2 = await smsCode(page, digits(phone2))
@@ -219,8 +236,21 @@ async function overflow(page) { return page.evaluate(() => document.documentElem
   check('campos e botão principal têm ≥ 52px de altura', sizes.every((h) => h >= 52), sizes.join(','))
   const fonts = await page.evaluate(() => [...document.querySelectorAll('main input')].map((e) => parseFloat(getComputedStyle(e).fontSize)))
   check('texto dos campos ≥ 16px (sem zoom automático no iPhone)', fonts.every((f) => f >= 16), fonts.join(','))
+  console.log('\n[9b] Pré-cadastro x abertura dos pedidos')
+  const closedPage = await ctx.newPage()
+  await closedPage.route('**/api/status', (r) => r.fulfill({ json: { preRegistrationOpen: false } }))
+  await closedPage.goto(B + '/cadastro')
+  await closedPage.waitForSelector('text=O pré-cadastro abre em breve')
+  check('pré-cadastro fechado: mostra aviso e a data dos pedidos, sem formulário', (await closedPage.locator('input').count()) === 0 && (await closedPage.locator('body').innerText()).includes('25/12/2026'))
+  await closedPage.close()
+  await page.goto(B + '/')
+  const landingText = (await page.locator('body').innerText()).replace(/\s+/g, ' ')
+  check('landing diz "Pedidos de orçamento abrem em 25/12/2026"', /pedidos de orçamento abrem em/i.test(landingText) && landingText.includes('25/12/2026'))
+  check('landing explica que o pré-cadastro é gratuito e a data é dos pedidos', /o pré-cadastro é gratuito/i.test(landingText) && /abertura dos pedidos/i.test(landingText))
+
   console.log('\n[10] Landing pública e cabeçalho')
   const anonCtx = await browser.newContext({ viewport: { width: 390, height: 844 } })
+  await anonCtx.addInitScript(() => localStorage.setItem('mdm_consent_v1', JSON.stringify({ marketing: false, at: 'teste' })))
   const anonPage = await anonCtx.newPage()
   const apiCalls = []
   anonPage.on('request', (r) => { if (r.url().includes('/api/auth/me')) apiCalls.push(r.url()) })

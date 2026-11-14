@@ -13,7 +13,7 @@ export default function Header({ variant = 'landing' }: { variant?: 'landing' | 
   return (
     <header className="sticky top-0 z-40 bg-graphite">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 md:px-8">
-        <Link to="/" aria-label={`${SITE.name} — início`} className="rounded-lg">
+        <Link to="/" aria-label={`${SITE.name} — início`} className="inline-flex min-h-11 items-center rounded-lg">
           <Logo />
         </Link>
 

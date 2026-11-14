@@ -5,7 +5,15 @@
 [build.environment]
   NODE_VERSION = "22"
 
-# SPA: qualquer rota cai no index.html (ex.: /cadastro)
+# API: /api/* vai para a função "api". Esta regra vem ANTES do fallback do SPA
+# (a primeira regra que casa vence), garantindo JSON e nunca a página HTML.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+# SPA: qualquer outra rota cai no index.html (ex.: /cadastro)
 [[redirects]]
   from = "/*"
   to = "/index.html"
