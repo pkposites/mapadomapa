@@ -71,3 +71,39 @@ Senha de acesso ao site inteiro (controle de visitantes da Netlify), **definida 
 - Provedor real de **SMS ou WhatsApp** (decisão e contrato do cliente).
 - CAPTCHA real (Turnstile), OpenAI real e Meta real, com chaves e limites próprios.
 - Revisão jurídica dos termos e da privacidade; revisão do conteúdo do questionário por especialistas.
+
+## 11. Verificação da infraestrutura na Netlify (somente leitura; nada criado)
+| Item | Constatação | Como sei |
+|---|---|---|
+| Site oficial `tangerine-creponne-82936e` | publicado, **Etapa 1 (estático)**, contexto produção, branch `claude/mapa-do-mapa-stage-1-i7yp10` | dados do deploy `6af7f225…` |
+| Banco Netlify no site oficial | **nenhum sinal de banco**: `database_branch_id`, `database_migrations` e `database_snapshots` são nulos; "No functions deployed" | dados do deploy. Não consegui consultar a API de banco diretamente (exige login da CLI, que não existe aqui) — é ausência de evidência forte, não prova absoluta |
+| Funções no site oficial | **nenhuma** (o deploy não tem Functions) | dados do deploy |
+| Integração Netlify Database × nosso código | **nunca testada na Netlify**. Só foi validada no **banco local embutido** (PGlite, pasta `.netlify/db` desta máquina), que **não é** um banco da Netlify | histórico do projeto |
+| Plano do time | time "QVNAds", tipo **Pro**, 1 membro, você é Owner | `get-team` |
+| Banco exige plano "baseado em créditos" | **não consigo confirmar** se o seu plano é; "Pro" pode ser legado ou baseado em créditos | documentação + dados do time |
+
+Por que o banco ainda não existe: segundo a documentação, a Netlify só provisiona o banco quando o código implantado traz o pacote `@netlify/database`. A Etapa 1 não tinha. **Atenção futura:** o primeiro deploy da Etapa 2/3 no site **oficial** provisionaria um banco lá automaticamente (e geraria cobrança). Por isso nada vai para o oficial sem aprovação.
+
+Cuidado registrado: a ferramenta de integração lista `initialize-database` como "leitura", mas ela **provisiona** um banco. Não foi usada.
+
+### Centralização na Netlify
+| Camada | Serviço Netlify | Situação |
+|---|---|---|
+| Hospedagem do site | Netlify Hosting | em uso (Etapa 1) |
+| API | Netlify Functions (`netlify/functions/api.mts`) | pronta, ainda não implantada |
+| Banco | Netlify Database (PostgreSQL) | pronto no código e nas migrações, **não provisionado** |
+| Segredos/variáveis | variáveis de ambiente da Netlify | em uso (2 variáveis da Meta, só no oficial/produção) |
+| Redirecionamentos | `netlify.toml` | pronto |
+Fica **fora** da Netlify por natureza: GitHub (código), Meta e OpenAI (APIs externas, simuladas nos testes) e o futuro SMS/WhatsApp (pendência do lançamento).
+
+### Consumo previsto da homologação (ESTIMATIVAS MINHAS, não medições da Netlify)
+Premissas: 1 site novo, 1 banco novo, 1 a 3 testadores, ~30 dias, sem PR/preview.
+| Recurso | Previsão |
+|---|---|
+| Builds | até ~15 deploys × 1–2 min ≈ **≤ 30 min** |
+| Functions | ~2.000 a 5.000 invocações (cada tela ≈ 1–3 chamadas; login ≈ 0,4 s de CPU por causa do hash de senha) |
+| Banco — armazenamento | **< 50 MB** (dados fictícios) |
+| Banco — computação | ativo só enquanto há teste (reduz a zero em inatividade): **~2 a 6 h/mês** |
+| Tráfego (banco + site) | **< 1 GB** |
+**Valor em reais: não consigo calcular** — não tenho o preço do crédito do seu plano. Confira em Netlify → Team → Billing/Usage antes de aprovar.
+Limitadores: não abrir PR (cada preview cria uma ramificação do banco); manter branch deploys desligados; um testador; **apagar o site e o banco ao final** (só o Owner apaga o banco).
