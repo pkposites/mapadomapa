@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ChevronRight, Megaphone, MessageCircle, MessageSquare, ShieldAlert, Search } from 'lucide-react'
+import { AlertTriangle, ChevronRight, ClipboardList, Megaphone, MessageCircle, MessageSquare, ShieldAlert, Search } from 'lucide-react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import Alert from '../components/ui/Alert'
@@ -54,6 +54,7 @@ function Panel() {
 
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Link to="/admin/mensagens" className="flex min-h-14 items-center gap-2 rounded-2xl bg-graphite px-4 font-semibold text-white"><MessageSquare size={18} aria-hidden="true" /> Mensagens{stats && stats.unreadMessages > 0 && <span className="ml-auto rounded-full bg-lime px-2 text-[13px] text-graphite">{stats.unreadMessages}</span>}</Link>
+            <Link to="/admin/pedidos" data-testid="link-pedidos" className="col-span-2 flex min-h-14 items-center gap-2 rounded-2xl bg-lime px-4 font-semibold text-graphite"><ClipboardList size={18} aria-hidden="true" /> Pedidos de Serviços</Link>
             <Link to="/admin/mural" className="flex min-h-14 items-center gap-2 rounded-2xl bg-white px-4 font-semibold"><MessageSquare size={18} aria-hidden="true" /> Mural</Link>
             <Link to="/admin/destaque" className="flex min-h-14 items-center gap-2 rounded-2xl bg-white px-4 font-semibold"><Megaphone size={18} aria-hidden="true" /> Interesse no Destaque</Link>
             <Link to="/admin/comunicados" className="flex min-h-14 items-center gap-2 rounded-2xl bg-white px-4 font-semibold"><Megaphone size={18} aria-hidden="true" /> Comunicados</Link>
