@@ -1,4 +1,4 @@
-import { env, isDevEnvironment } from './env'
+import { env, isSimulationEnvironment } from './env'
 import { ApiError } from './http'
 
 /**
@@ -22,8 +22,8 @@ const failed = () =>
 
 type Provider = 'dev' | 'turnstile' | null
 export function captchaProvider(): Provider {
-  const p = env('CAPTCHA_PROVIDER') ?? (isDevEnvironment() ? 'dev' : undefined)
-  if (p === 'dev' && isDevEnvironment()) return 'dev' // o simulador nunca vale fora do local
+  const p = env('CAPTCHA_PROVIDER') ?? (isSimulationEnvironment() ? 'dev' : undefined)
+  if (p === 'dev' && isSimulationEnvironment()) return 'dev' // o simulador nunca vale em produção
   if (p === 'turnstile' && (env('TURNSTILE_SECRET_KEY') ?? '').length >= 10) return 'turnstile'
   return null
 }

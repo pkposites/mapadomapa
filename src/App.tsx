@@ -9,6 +9,8 @@ import Profissional from './pages/Profissional'
 import DevSmsPanel from './components/DevSmsPanel'
 import ConsentBanner from './components/ConsentBanner'
 import MetaRouteTracker from './components/MetaRouteTracker'
+import StagingBanner from './components/StagingBanner'
+import { SIM_MODE } from './lib/sim'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/guards'
 import Cadastro from './pages/Cadastro'
@@ -29,6 +31,7 @@ function ScrollManager() {
 export default function App() {
   return (
     <AuthProvider>
+      <StagingBanner />
       <ScrollManager />
       <MetaRouteTracker />
       <Routes>
@@ -44,7 +47,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <ConsentBanner />
-      {import.meta.env.DEV && <DevSmsPanel />}
+      {SIM_MODE && <DevSmsPanel />}
     </AuthProvider>
   )
 }

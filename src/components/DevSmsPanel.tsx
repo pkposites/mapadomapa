@@ -46,7 +46,7 @@ export default function DevSmsPanel() {
       {open ? (
         <div className="w-[min(88vw,340px)] rounded-2xl border border-white/10 bg-graphite p-3 text-white shadow-lg">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-lime">SMS simulado · só local</p>
+            <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-lime">SMS simulado · só testes</p>
             <button type="button" aria-label="Fechar simulador" onClick={() => setOpen(false)} className="grid size-9 place-items-center rounded-lg text-on-dark hover:text-white">
               <X size={18} />
             </button>

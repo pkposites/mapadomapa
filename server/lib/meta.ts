@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { now } from './clock'
 import { query } from './db'
-import { env, isDevEnvironment } from './env'
+import { env, isSimulationEnvironment } from './env'
 
 /**
  * Meta Conversions API (eventos confirmados pelo SERVIDOR).
@@ -29,7 +29,7 @@ const accessToken = (): string | undefined => {
 const graphVersion = (): string => (/^v\d+\.\d+$/.test(env('META_GRAPH_VERSION') ?? '') ? (env('META_GRAPH_VERSION') as string) : 'v25.0')
 
 export function metaMode(): MetaMode {
-  if (isDevEnvironment()) return 'sim'
+  if (isSimulationEnvironment()) return 'sim'
   return pixelId() && accessToken() ? 'live' : 'off'
 }
 

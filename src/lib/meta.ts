@@ -1,4 +1,5 @@
 import { readConsent } from './consent'
+import { SIM_MODE } from './sim'
 
 /**
  * Meta Pixel (eventos no NAVEGADOR). Docs:
@@ -6,7 +7,7 @@ import { readConsent } from './consent'
  *  https://developers.facebook.com/documentation/ads-commerce/conversions-api/deduplicate-pixel-and-server-events
  *
  * - O script da Meta só é baixado DEPOIS do consentimento (antes, nem a conexão é feita).
- * - Em desenvolvimento (import.meta.env.DEV) o script NUNCA é baixado: um "fbq" falso apenas
+ * - Em desenvolvimento ou homologação (SIM_MODE) o script NUNCA é baixado: um "fbq" falso apenas
  *   registra os eventos em window.__metaEvents (visíveis no painel local). Zero conversões reais.
  * - Eventos que também são enviados pelo servidor levam o mesmo event_id (eventID) para deduplicação.
  */
@@ -56,7 +57,7 @@ function start(): boolean {
   if (!metaConfigured) return false
   if (!started) {
     started = true
-    if (import.meta.env.DEV) installSimulatedPixel()
+    if (SIM_MODE) installSimulatedPixel() // local OU homologação: o script da Meta nunca é baixado
     else installRealPixel()
     window.fbq!('init', PIXEL_ID)
   }

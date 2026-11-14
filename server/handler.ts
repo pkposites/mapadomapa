@@ -1,7 +1,7 @@
 import { audit } from './lib/audit'
 import { addSeconds, now } from './lib/clock'
 import { query } from './lib/db'
-import { isDevEnvironment, isPreRegistrationOpen } from './lib/env'
+import { isDevEnvironment, isPreRegistrationOpen, isSimulationEnvironment, isStagingSimulation, runInRequestContext } from './lib/env'
 import {
   ApiError, assertSameOrigin, clearSessionCookie, errorResponse, json, readCookie, readJson,
   SESSION_COOKIE, sessionCookie,
@@ -42,7 +42,7 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
 
   // ---------- Rotas só do ambiente local (simulador de SMS e utilitários de teste) ----------
   if (path.startsWith('/dev/')) {
-    if (!isDevEnvironment()) throw new ApiError(404, 'not_found', 'Não encontrado.')
+    if (!isSimulationEnvironment()) throw new ApiError(404, 'not_found', 'Não encontrado.')
     if (method === 'GET' && path === '/dev/sms') {
       const rows = await query(
         'SELECT phone_e164 AS phone, purpose, body, created_at FROM sms_messages WHERE provider = $1 ORDER BY created_at DESC LIMIT 10',
@@ -123,8 +123,14 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
 
 /** Ponto de entrada da API: traduz erros previstos em respostas amigáveis. */
 export async function handleApi(req: Request, apiCtx: ApiContext = {}): Promise<Response> {
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host')
   try {
-    return await route(req, apiCtx)
+    return await runInRequestContext(host, async () => {
+      const res = await route(req, apiCtx)
+      // Homologação nunca deve ser indexada por buscadores.
+      if (isStagingSimulation()) res.headers.set('x-robots-tag', 'noindex, nofollow')
+      return res
+    })
   } catch (err) {
     if (err instanceof ApiError) return errorResponse(err)
     console.error('[api] erro inesperado:', err)

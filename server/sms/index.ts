@@ -1,4 +1,4 @@
-import { env, isDevEnvironment } from '../lib/env'
+import { env, isSimulationEnvironment } from '../lib/env'
 import { ApiError } from '../lib/http'
 import { query } from '../lib/db'
 
@@ -31,8 +31,8 @@ const devProvider: SmsProvider = {
  * integrado e aprovado, o envio falha de forma explícita (nunca "finge" que enviou).
  */
 export function getSmsProvider(): SmsProvider {
-  const configured = env('SMS_PROVIDER') ?? (isDevEnvironment() ? 'dev' : undefined)
-  if (configured === 'dev' && isDevEnvironment()) return devProvider
+  const configured = env('SMS_PROVIDER') ?? (isSimulationEnvironment() ? 'dev' : undefined)
+  if (configured === 'dev' && isSimulationEnvironment()) return devProvider
   console.error(`[sms] provedor indisponível (SMS_PROVIDER=${configured ?? 'não definido'}).`)
   throw new ApiError(503, 'sms_unavailable', 'Não conseguimos enviar o SMS agora. Tente novamente em alguns minutos.')
 }

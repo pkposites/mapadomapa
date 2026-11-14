@@ -42,3 +42,7 @@ Status: desenvolvido e testado **somente em ambiente local**, na branch de desen
 2. **Regiões** e **pesos** da pontuação: confirmar com o negócio.
 3. OpenAI real: nunca testada com chamada de verdade (por decisão); validar em homologação com limite de gasto.
 4. Revisão administrativa (painel) fica para a Etapa 4 — não iniciada.
+
+## Homologação (preparação)
+Ver `docs/HOMOLOGACAO.md`: modo homologação implementado e testado localmente (15 testes), com salvaguardas de host, ausência de credenciais reais, `noindex` e faixa de "ambiente de testes". **Nada publicado.**
+Decisão do cliente: **sem SMS/WhatsApp real nesta fase** (pendência do lançamento público).

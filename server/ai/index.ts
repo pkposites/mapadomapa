@@ -1,4 +1,4 @@
-import { env, isDevEnvironment } from '../lib/env'
+import { env, isSimulationEnvironment } from '../lib/env'
 import { QUESTIONNAIRES, type OpenQuestion } from '../pro/questions'
 
 /**
@@ -18,7 +18,7 @@ export type AiOutcome =
   | { status: 'off' }
 
 export function aiMode(): 'sim' | 'openai' | 'off' {
-  if (isDevEnvironment()) return 'sim' // localmente NUNCA chama a OpenAI, mesmo com chave configurada
+  if (isSimulationEnvironment()) return 'sim' // local ou homologação: NUNCA chama a OpenAI, mesmo com chave configurada
   if (env('AI_PROVIDER') === 'openai' && env('OPENAI_API_KEY') && env('OPENAI_MODEL')) return 'openai'
   return 'off'
 }

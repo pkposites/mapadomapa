@@ -4,13 +4,16 @@ import { AlertCircle } from 'lucide-react'
 /**
  * Verificação anti-robô. Três modos, escolhidos automaticamente:
  *  1) Cloudflare Turnstile  — se VITE_TURNSTILE_SITE_KEY estiver definida (chave PÚBLICA).
- *  2) Simulado               — somente em desenvolvimento (import.meta.env.DEV). Custo zero.
+ *  2) Simulado               — somente em desenvolvimento ou homologação (SIM_MODE). Custo zero.
  *  3) Nada                   — produção sem chave: o servidor recusa (falha fechada) e a tela mostra o erro.
  * A validação que realmente protege acontece no servidor (server/lib/captcha.ts).
  * Doc: https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/
  */
-const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
-export const captchaEnabled = Boolean(SITE_KEY) || import.meta.env.DEV
+import { SIM_MODE } from '../../lib/sim'
+
+// Em modo de simulação o widget real nunca é usado, mesmo que exista uma chave.
+const SITE_KEY = SIM_MODE ? undefined : (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)
+export const captchaEnabled = Boolean(SITE_KEY) || SIM_MODE
 export const DEV_CAPTCHA_TOKEN = 'dev-captcha-pass'
 
 type TurnstileApi = {
@@ -111,7 +114,7 @@ export default function CaptchaField({ onToken, resetSignal, error }: Props) {
           />
           <span>
             Não sou um robô
-            <span className="block text-[13px] font-normal text-muted">Verificação simulada (só em desenvolvimento)</span>
+            <span className="block text-[13px] font-normal text-muted">Verificação simulada (só em testes)</span>
           </span>
         </label>
       )}
