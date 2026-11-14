@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Landing from './pages/Landing'
 import Entrar from './pages/Entrar'
+import NotFound from './pages/NotFound'
 import Inicio from './pages/area/Inicio'
 import Perfil from './pages/area/Perfil'
 import MuralPage from './pages/area/MuralPage'
@@ -62,7 +63,7 @@ export default function App() {
         <Route path="/admin/mensagens" element={<AdminMensagens />} />
         <Route path="/admin/comunicados" element={<AdminComunicados />} />
         <Route path="/admin/profissionais/:id" element={<AdminProfissional />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
       <ConsentBanner />
       {SIM_MODE && <DevSmsPanel />}

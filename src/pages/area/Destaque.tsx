@@ -4,6 +4,7 @@ import { ArrowLeft, BadgeCheck, CheckCircle2, ListChecks, Rocket, Sparkles } fro
 import AreaShell from '../../area/Shell'
 import Alert from '../../components/ui/Alert'
 import Spinner from '../../components/ui/Spinner'
+import { SITE } from '../../config/site'
 import SubmitButton from '../../components/ui/SubmitButton'
 import { api, ApiError } from '../../lib/api'
 
@@ -37,7 +38,7 @@ export default function Destaque() {
       <section className="mt-5 rounded-3xl bg-graphite p-5 text-white" aria-label="Meta">
         <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-lime"><Rocket size={16} aria-hidden="true" /> Nossa meta</p>
         <p className="mt-2 flex items-end gap-3"><span className="text-[56px] font-bold leading-none tracking-[-0.04em] text-lime">3+</span><span className="pb-1 text-[17px] leading-tight">contatos de clientes<br />por semana</span></p>
-        <p className="mt-3 text-[13px] leading-snug text-on-dark">Meta de referência, <strong className="text-white">sem garantia</strong>. Depende da profissão, da região e da demanda, e os pedidos reais começam em 25/11/2026.</p>
+        <p className="mt-3 text-[13px] leading-snug text-on-dark">Meta de referência, <strong className="text-white">sem garantia</strong>. Depende da profissão, da região e da demanda, e os pedidos reais começam em {SITE.requestsOpenLabel}.</p>
       </section>
 
       <section className="mt-5 rounded-3xl bg-white p-5">

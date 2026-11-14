@@ -1,13 +1,15 @@
+import { REQUESTS_OPEN_AT, REQUESTS_OPEN_LABEL } from '../../shared/launch'
+
 export const SITE = {
   name: 'Mapa do Mapa',
   city: 'São Paulo',
   /**
-   * Abertura dos PEDIDOS de orçamento (clientes pedindo, profissionais respondendo): 25/11/2026,
+   * Abertura dos PEDIDOS de orçamento (clientes pedindo, profissionais respondendo) — ver shared/launch.ts,
    * 00:00 no horário de Brasília. NÃO é a abertura do pré-cadastro — esse é controlado pelo
    * servidor (PRE_REGISTRATION_OPEN) e pode abrir antes.
    */
-  requestsOpenDate: new Date('2026-11-25T00:00:00-03:00'),
-  requestsOpenLabel: '25/11/2026',
+  requestsOpenDate: REQUESTS_OPEN_AT, // definido em shared/launch.ts (fonte única)
+  requestsOpenLabel: REQUESTS_OPEN_LABEL,
   signupPath: '/cadastro',
   ctaLabel: 'Quero me cadastrar',
   instagramUrl: 'https://www.instagram.com/mapadomapa/',

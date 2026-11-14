@@ -13,9 +13,14 @@ const TABS = [
 ] as const
 
 /** Moldura da Área do Profissional: barra superior escura + navegação inferior (pensada para o celular). */
+const SEEN = 'mdm_pedidos_seen'
+const readSeen = () => { try { return localStorage.getItem(SEEN) === '1' } catch { return false } }
+
 export default function AreaShell({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState(0)
   const { pathname } = useLocation()
+  const [seen, setSeen] = useState(readSeen) // destaque leve em "Pedidos" até a pessoa abrir a tela
+  useEffect(() => { if (pathname === '/area/pedidos' && !seen) { try { localStorage.setItem(SEEN, '1') } catch { /* sem storage */ } setSeen(true) } }, [pathname, seen])
   useEffect(() => {
     const load = () => api.get<{ unread: number }>('/pro/messages/unread').then((r) => setUnread(r.unread)).catch(() => {})
     void load()
@@ -39,6 +44,9 @@ export default function AreaShell({ children }: { children: ReactNode }) {
                   <>
                     <span className={`grid h-7 w-12 place-items-center rounded-full ${isActive ? 'bg-lime' : ''}`}><Icon size={22} strokeWidth={isActive ? 2.25 : 1.75} aria-hidden="true" /></span>
                     {label}
+                    {to === '/area/pedidos' && !seen && (
+                      <span aria-hidden="true" data-testid="pedidos-dot" className="absolute right-[26%] top-2.5 size-2.5"><span className="absolute inset-0 rounded-full bg-lime motion-safe:animate-ping opacity-60" /><span className="absolute inset-0 rounded-full bg-lime ring-2 ring-white" /></span>
+                    )}
                     {to === '/area/mensagens' && unread > 0 && (
                       <span aria-label={`${unread} não lidas`} className="absolute right-[22%] top-2 grid min-w-5 place-items-center rounded-full bg-danger px-1 text-[11px] font-bold leading-5 text-white">{unread}</span>
                     )}

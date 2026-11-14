@@ -1,4 +1,5 @@
 import { audit } from '../lib/audit'
+import { REQUESTS_OPEN_LABEL } from '../../shared/launch'
 import { enforce } from '../lib/rateLimit'
 import { now } from '../lib/clock'
 import { query, withTransaction } from '../lib/db'
@@ -224,7 +225,7 @@ export const WELCOME_TEMPLATE = `Olá, [nome]! 👋
 
 Seja bem-vindo ao Mapa do Mapa!
 
-Estamos preparando tudo para o início dos pedidos de orçamento, previsto para 25/11/2026.
+Estamos preparando tudo para o início dos pedidos de orçamento, previsto para ${REQUESTS_OPEN_LABEL}.
 
 Enquanto isso, complete seu perfil e acompanhe os comunicados por aqui.
 

@@ -4,6 +4,7 @@ import { Camera, LogOut } from 'lucide-react'
 import AreaShell from '../../area/Shell'
 import Alert from '../../components/ui/Alert'
 import Spinner from '../../components/ui/Spinner'
+import InstallPrompt from '../../area/InstallPrompt'
 import SubmitButton from '../../components/ui/SubmitButton'
 import { useAuth } from '../../auth/AuthContext'
 import { api, ApiError } from '../../lib/api'
@@ -89,7 +90,7 @@ export default function Perfil() {
           <input id="fullName" autoComplete="name" maxLength={80} value={f.fullName} onChange={(e) => setF({ ...f, fullName: e.target.value })} className={`${field} min-h-13`} disabled={blocked} />
           <p className={`${label} mt-4`}>Celular</p>
           <p className="mt-1 text-[16px]" data-testid="my-phone">{phone?.phone} <span className="ml-2 rounded-full bg-ice px-2.5 py-1 text-[13px] text-muted">{phone?.verified ? 'verificado' : 'não verificado'}</span></p>
-          <p className="mt-1 text-[13px] text-muted">O celular só pode ser alterado pela equipe.</p>
+          <p className="mt-1 text-[13px] leading-snug text-muted">O celular só pode ser alterado pela equipe. {phone?.verified ? '' : 'A verificação é feita manualmente pela equipe durante a análise do cadastro; se tiver dúvidas, escreva em Mensagens.'}</p>
           <label htmlFor="bio" className={`${label} mt-4`}>Apresentação profissional</label>
           <textarea id="bio" rows={4} maxLength={600} value={f.bio} onChange={(e) => setF({ ...f, bio: e.target.value })} className={field} disabled={blocked} placeholder="Conte quem você é e como trabalha." />
           <label htmlFor="services" className={`${label} mt-4`}>Serviços que você realiza</label>
@@ -142,6 +143,8 @@ export default function Perfil() {
             onClick={() => { if (me.regionsChangeResubmits && !window.confirm('Seu cadastro voltará para análise. Continuar?')) return; void run('regions', () => api.put<Me>('/pro/me/regions', { regions: regs }), me.regionsChangeResubmits ? 'Regiões salvas. Seu cadastro voltou para análise.' : 'Regiões salvas.') }}>Salvar regiões</SubmitButton></div>
           {note('regions')}
         </section>
+
+        <InstallPrompt persistent />
 
         <SubmitButton type="button" variant="ghost" className="border border-line" onClick={async () => { try { await logout(); navigate('/', { replace: true }) } catch { setMsg({ tone: 'error', text: 'Não foi possível sair agora. Tente de novo.', at: 'top' }) } }}><LogOut size={18} aria-hidden="true" /> Sair da conta</SubmitButton>
         {note('top')}

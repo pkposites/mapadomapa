@@ -1,10 +1,11 @@
 import LegalPage, { type LegalSection } from '../components/LegalPage'
+import { SITE } from '../config/site'
 
 const SECTIONS: LegalSection[] = [
   {
     title: 'Quem somos',
     body: [
-      'O Mapa do Mapa é uma plataforma, em pré-lançamento, que conectará profissionais autônomos a clientes em São Paulo. O pré-cadastro de profissionais está aberto; os pedidos de orçamento estão previstos para 25/11/2026.',
+      `O Mapa do Mapa é uma plataforma, em pré-lançamento, que conectará profissionais autônomos a clientes em São Paulo. O pré-cadastro de profissionais está aberto; os pedidos de orçamento estão previstos para ${SITE.requestsOpenLabel}.`,
     ],
     pending: 'Razão social, CNPJ, endereço e canal de contato do controlador dos dados.',
   },

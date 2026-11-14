@@ -18,15 +18,24 @@ export function privacySignal(): boolean {
   return nav.globalPrivacyControl === true || nav.doNotTrack === '1' || w.doNotTrack === '1' || nav.msDoNotTrack === '1'
 }
 
+// Se o navegador bloquear o armazenamento (aba privada, automação, política do aparelho), a escolha ainda
+// vale na hora (memória) e tenta persistir por cookie. Sem isso o banner não fechava depois de "Recusar".
+let memory: ConsentState | null = null
+const COOKIE = 'mdm_consent'
+const readCookie = (): ConsentState | null => {
+  try { const m = document.cookie.match(new RegExp(`(?:^|; )${COOKIE}=([01])`)); return m ? (m[1] === '1' ? 'granted' : 'denied') : null } catch { return null }
+}
+
 export function readConsent(): ConsentState {
   if (privacySignal()) return 'denied'
+  if (memory) return memory
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? 'null')
     if (v && typeof v.marketing === 'boolean') return v.marketing ? 'granted' : 'denied'
   } catch {
-    /* sem storage: trata como sem escolha */
+    /* sem storage: tenta o cookie */
   }
-  return 'unset'
+  return readCookie() ?? 'unset'
 }
 
 // ---- pequeno "store" para o React reagir às mudanças
@@ -39,6 +48,8 @@ const subscribe = (l: () => void) => {
 }
 
 export function setConsent(granted: boolean): void {
+  memory = granted ? 'granted' : 'denied'
+  try { document.cookie = `${COOKIE}=${granted ? 1 : 0}; Max-Age=31536000; Path=/; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}` } catch { /* sem cookies */ }
   try {
     localStorage.setItem(KEY, JSON.stringify({ marketing: granted, at: new Date().toISOString() }))
   } catch {

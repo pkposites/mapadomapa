@@ -10,7 +10,7 @@ import Button from '../components/Button'
 import Spinner from '../components/ui/Spinner'
 import { useAuth } from '../auth/AuthContext'
 import { api, ApiError } from '../lib/api'
-import { getStatus } from '../lib/status'
+import { getStatus, peekStatus } from '../lib/status'
 import { isPhoneComplete } from '../lib/phone'
 import { mmss, useCooldown } from '../hooks/useCooldown'
 import { SITE } from '../config/site'
@@ -49,8 +49,8 @@ export default function Cadastro() {
   const [cooldown, startCooldown] = useCooldown()
   const [captcha, setCaptcha] = useState<string | null>(null)
   const [captchaReset, setCaptchaReset] = useState(0)
-  const [open, setOpen] = useState<boolean | null>(null) // pré-cadastro aberto?
-  const [vmode, setVmode] = useState<'admin' | 'sms'>('admin') // como o celular é verificado
+  const [open, setOpen] = useState<boolean | null>(() => peekStatus()?.preRegistrationOpen ?? null) // pré-cadastro aberto?
+  const [vmode, setVmode] = useState<'admin' | 'sms'>(() => peekStatus()?.verificationMode ?? 'admin') // como o celular é verificado
   const [captchaMode, setCaptchaMode] = useState<CaptchaMode>(null)
   const [hp, setHp] = useState('') // campo-isca anti-robô (pessoas nunca veem)
 
@@ -196,6 +196,13 @@ export default function Cadastro() {
       below={<>Já tem conta? <Link to="/entrar" className={standaloneLink}>Entrar</Link></>}
     >
       <form onSubmit={submitForm} noValidate className="space-y-5">
+        <div data-testid="signup-steps" aria-label="Passos do cadastro">
+          <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Passo 1 de 4 · Crie sua conta</p>
+          <div className="mt-2 grid grid-cols-4 gap-1.5" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => <span key={i} className={`h-1.5 rounded-full ${i === 0 ? 'bg-graphite' : 'bg-line'}`} />)}
+          </div>
+          <p className="mt-2 text-[14px] leading-snug text-muted">Depois você escolhe até 2 profissões e 2 regiões, conta sua experiência e responde a 3 perguntas rápidas por profissão.</p>
+        </div>
         {errors.form && (
           <Alert tone="error">
             {errors.form}{' '}

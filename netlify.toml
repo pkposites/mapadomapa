@@ -13,11 +13,8 @@
   status = 200
   force = true
 
-# SPA: qualquer outra rota cai no index.html (ex.: /cadastro)
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# SPA: as rotas do app ficam em public/_redirects (valem só no Netlify, não no servidor local).
+# NÃO crie aqui uma regra "/*": sem ela, endereços inexistentes recebem o 404 de verdade (public/404.html).
 
 # O service worker nunca deve ficar em cache, senão o PWA não atualiza.
 [[headers]]

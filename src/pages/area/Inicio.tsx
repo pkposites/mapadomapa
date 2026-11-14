@@ -11,6 +11,7 @@ import Spinner from '../../components/ui/Spinner'
 import Alert from '../../components/ui/Alert'
 import { api } from '../../lib/api'
 import { useAuth } from '../../auth/AuthContext'
+import { SITE } from '../../config/site'
 import { NEXT_STEPS, STATUS_HINT, STATUS_TONE, type Announcement, type Home } from '../../area/types'
 
 const fmt = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
@@ -44,6 +45,7 @@ export default function Inicio() {
             <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Status do cadastro</p>
             <p className={`mt-2 inline-block rounded-full px-3.5 py-1.5 text-[15px] font-semibold ${STATUS_TONE[h.status] ?? 'bg-ice'}`} data-testid="status-badge">{h.statusLabel}</p>
             <p className="mt-3 text-[15px] leading-snug text-muted">{STATUS_HINT[h.status]}</p>
+            {user && !user.phoneVerified && <p className="mt-3 rounded-2xl bg-ice p-3 text-[14px] leading-snug" data-testid="phone-note"><strong>Celular ainda não verificado.</strong> A equipe verifica manualmente durante a análise do cadastro. Se tiver dúvidas, escreva em <Link to="/area/mensagens" className="font-semibold underline">Mensagens</Link>.</p>}
             <p className="mt-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Próximos passos</p>
             <ol className="mt-2 list-decimal space-y-1 pl-5 text-[15px] leading-snug" data-testid="next-steps">{(NEXT_STEPS[h.status] ?? []).map((t) => <li key={t}>{t}</li>)}</ol>
             {h.decision?.notes && (
@@ -115,7 +117,7 @@ export default function Inicio() {
             <ol className="mt-3 list-decimal space-y-2 pl-5 text-[15px] leading-snug text-muted">
               <li>Você faz o pré-cadastro e responde às perguntas rápidas.</li>
               <li>Nossa equipe analisa e aprova cada perfil. Nada é automático.</li>
-              <li>Os pedidos de orçamento começam em 25/11/2026. Cada pedido chegará para você e você escolhe responder ou não.</li>
+              <li>Os pedidos de orçamento começam em {SITE.requestsOpenLabel}. Cada pedido chegará para você e você escolhe responder ou não.</li>
               <li>Fale com a equipe a qualquer momento em Mensagens.</li>
             </ol>
           </details>

@@ -1,10 +1,11 @@
 import LegalPage, { type LegalSection } from '../components/LegalPage'
+import { SITE } from '../config/site'
 
 const SECTIONS: LegalSection[] = [
   {
     title: 'Sobre o serviço',
     body: [
-      'O Mapa do Mapa é uma plataforma que pretende aproximar profissionais autônomos de clientes que buscam orçamentos de serviços em São Paulo. O pré-cadastro de profissionais é gratuito e a abertura dos pedidos de orçamento está prevista para 25/11/2026.',
+      `O Mapa do Mapa é uma plataforma que pretende aproximar profissionais autônomos de clientes que buscam orçamentos de serviços em São Paulo. O pré-cadastro de profissionais é gratuito e a abertura dos pedidos de orçamento está prevista para ${SITE.requestsOpenLabel}.`,
     ],
     pending: 'Descrição jurídica precisa do serviço e do papel da plataforma (intermediação, sem vínculo com a prestação do serviço?).',
   },
@@ -25,7 +26,7 @@ const SECTIONS: LegalSection[] = [
   {
     title: 'Orçamentos, pagamentos e custos',
     body: [
-      'O cadastro é gratuito. Os pedidos de orçamento estão previstos para 25/11/2026. Condições de orçamento, contratação e pagamento entre profissional e cliente serão detalhadas antes dessa abertura.',
+      `O cadastro é gratuito. Os pedidos de orçamento estão previstos para ${SITE.requestsOpenLabel}. Condições de orçamento, contratação e pagamento entre profissional e cliente serão detalhadas antes dessa abertura.`,
     ],
     pending: 'Modelo de cobrança (se houver), meios de pagamento e política de cancelamento/reembolso.',
   },

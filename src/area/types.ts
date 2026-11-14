@@ -1,3 +1,4 @@
+import { REQUESTS_OPEN_LABEL as OPEN } from '../../shared/launch'
 export type Announcement = { id: string; title: string; body: string; at: string; read: boolean }
 export type Home = {
   name: string | null; firstName: string | null; status: string; statusLabel: string
@@ -22,7 +23,7 @@ export const STATUS_TONE: Record<string, string> = {
 export const STATUS_HINT: Record<string, string> = {
   not_submitted: 'Termine o cadastro e envie para análise.',
   pending_review: 'Nossa equipe está analisando. Você será avisado aqui.',
-  approved: 'Seu cadastro foi aprovado. Os pedidos reais começam em 25/11/2026.',
+  approved: `Seu cadastro foi aprovado. Os pedidos reais começam em ${OPEN}.`,
   needs_changes: 'Precisamos de ajustes. Veja a orientação abaixo e reenvie.',
   rejected: 'Seu cadastro não foi aprovado. Fale com a equipe se tiver dúvidas.',
   suspended: 'Seu cadastro está suspenso. Fale com a equipe pela caixa de mensagens.',
@@ -32,7 +33,7 @@ export const STATUS_HINT: Record<string, string> = {
 export const NEXT_STEPS: Record<string, string[]> = {
   not_submitted: ['Escolha até 2 profissões e 2 regiões.', 'Responda às perguntas rápidas.', 'Envie o cadastro para análise da equipe.'],
   pending_review: ['Aguarde a análise da equipe. Você será avisado aqui e em Mensagens.', 'Enquanto isso, você pode completar a foto e a apresentação no seu perfil.'],
-  approved: ['Complete seu perfil (foto, apresentação e serviços) para se destacar.', 'Acompanhe os comunicados: os pedidos de orçamento começam em 25/11/2026.', 'Indique outros profissionais para o pré-cadastro.'],
+  approved: ['Complete seu perfil (foto, apresentação e serviços) para se destacar.', `Acompanhe os comunicados: os pedidos de orçamento começam em ${OPEN}.`, 'Indique outros profissionais para o pré-cadastro.'],
   needs_changes: ['Leia a orientação da equipe acima.', 'Ajuste o cadastro e envie de novo para análise.'],
   rejected: ['Se tiver dúvidas sobre a decisão, converse com a equipe em Mensagens.'],
   suspended: ['Converse com a equipe em Mensagens para entender o motivo e como regularizar.'],

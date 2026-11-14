@@ -8,4 +8,7 @@ export type SystemStatus = {
   captcha: 'dev' | 'turnstile' | 'pow' | null
 }
 let cached: Promise<SystemStatus> | null = null
-export const getStatus = (): Promise<SystemStatus> => (cached ??= api.get<SystemStatus>('/status').catch((e) => { cached = null; throw e }))
+let value: SystemStatus | null = null
+export const getStatus = (): Promise<SystemStatus> => (cached ??= api.get<SystemStatus>('/status').then((s) => (value = s)).catch((e) => { cached = null; throw e }))
+/** Valor já carregado (síncrono) ou null. Permite abrir /cadastro sem "Carregando" quando a landing já buscou. */
+export const peekStatus = (): SystemStatus | null => value

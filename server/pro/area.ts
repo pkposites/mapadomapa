@@ -38,7 +38,7 @@ export async function home(userId: string) {
 
   const pendencies: { id: string; text: string; to: string; required: boolean }[] = []
   if (!p.full_name) pendencies.push({ id: 'name', text: 'Informe seu nome completo.', to: '/area/perfil', required: true })
-  if (status === 'not_submitted') pendencies.push({ id: 'finish', text: st.progress.professions ? `Continue seu cadastro: você parou no passo ${st.nextStep} de 5.` : 'Escolha suas profissões, regiões e responda às perguntas.', to: '/profissional', required: true })
+  if (status === 'not_submitted') pendencies.push({ id: 'finish', text: st.progress.professions ? `Continue seu cadastro: você parou no passo ${[2, 2, 3, 4, 4][st.nextStep - 1] ?? 4} de 4.` : 'Escolha suas profissões, regiões e responda às perguntas.', to: '/profissional', required: true })
   if (status === 'needs_changes') pendencies.push({ id: 'changes', text: 'A equipe pediu ajustes no seu cadastro. Leia a orientação e reenvie.', to: '/profissional', required: true })
   if (!hasPhoto) pendencies.push({ id: 'photo', text: 'Adicione uma foto de perfil.', to: '/area/perfil', required: false })
   if (!p.bio) pendencies.push({ id: 'bio', text: 'Escreva uma apresentação profissional.', to: '/area/perfil', required: false })

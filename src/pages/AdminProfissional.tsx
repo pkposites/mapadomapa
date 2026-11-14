@@ -11,6 +11,7 @@ import StatusBadge from '../admin/StatusBadge'
 import type { Detail, Status } from '../admin/types'
 import { Thread } from './area/Mensagens'
 import WelcomeBox from '../admin/WelcomeBox'
+import { SITE } from '../config/site'
 import type { Msg } from '../area/types'
 import { api, ApiError } from '../lib/api'
 
@@ -32,7 +33,7 @@ const WELCOME_DEFAULT = `Olá, [nome]! 👋
 
 Seja bem-vindo ao Mapa do Mapa!
 
-Estamos preparando tudo para o início dos pedidos de orçamento, previsto para 25/11/2026.
+Estamos preparando tudo para o início dos pedidos de orçamento, previsto para ${SITE.requestsOpenLabel}.
 
 Enquanto isso, complete seu perfil e acompanhe os comunicados por aqui.
 

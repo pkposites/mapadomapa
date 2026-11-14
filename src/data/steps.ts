@@ -1,9 +1,11 @@
+import { REQUESTS_OPEN_LABEL } from '../../shared/launch'
+
 export const STEPS = [
   { title: 'Cadastro gratuito', text: 'Crie sua conta só com celular e senha e escolha até 2 profissões e 2 regiões de São Paulo.' },
   { title: 'Perguntas rápidas', text: 'Responda 3 perguntas práticas por profissão. Leva poucos minutos.' },
   { title: 'Análise da equipe', text: 'Nossa equipe confere cada cadastro. Nada é aprovado automaticamente.' },
   { title: 'Aprovação', text: 'Aprovado, seu perfil fica pronto. Você acompanha tudo na sua área e pelas mensagens.' },
-  { title: 'Início dos pedidos', text: 'Os pedidos de orçamento começam em 25/11/2026. Quem já está aprovado sai na frente.' },
+  { title: 'Início dos pedidos', text: `Os pedidos de orçamento começam em ${REQUESTS_OPEN_LABEL}. Quem já está aprovado sai na frente.` },
 ] as const
 
 export const BENEFITS = [
