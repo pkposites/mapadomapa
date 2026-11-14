@@ -82,7 +82,7 @@ export default function Cadastro() {
     if (Object.keys(next).length) return
     setBusy(true)
     try {
-      const r = await api.post<Registered | { ok: true; mode: 'admin' }>('/auth/register', { phone, password, acceptTerms: true, captchaToken: captcha, website: hp })
+      const r = await api.post<Registered | { ok: true; mode: 'admin' }>('/auth/register', { phone, password, acceptTerms: true, captchaToken: captcha, contato_extra: hp })
       if ('mode' in r) { // MVP: conta criada e já logada; o celular será verificado pela equipe
         await refresh()
         navigate('/profissional', { replace: true })
@@ -231,7 +231,7 @@ export default function Cadastro() {
         </div>
 
         <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
-          <label>Não preencha este campo<input type="text" name="website" tabIndex={-1} autoComplete="off" value={hp} onChange={(e) => setHp(e.target.value)} /></label>
+          <label>Não preencha este campo<input type="text" name="contato_extra" tabIndex={-1} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-lpignore="true" data-1p-ignore="true" value={hp} onChange={(e) => setHp(e.target.value)} /></label>
         </div>
         <CaptchaField onToken={setCaptcha} onMode={setCaptchaMode} resetSignal={captchaReset} error={errors.captcha} />
         <SubmitButton type="submit" loading={busy}>{vmode === 'admin' ? 'Criar minha conta' : 'Continuar'}</SubmitButton>

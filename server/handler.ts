@@ -160,7 +160,10 @@ export async function handleApi(req: Request, apiCtx: ApiContext = {}): Promise<
       return res
     })
   } catch (err) {
-    if (err instanceof ApiError) return errorResponse(err)
+    if (err instanceof ApiError) {
+      if (err.status >= 400) console.warn(`[api] ${req.method} ${new URL(req.url).pathname} -> ${err.status} ${err.code}`)
+      return errorResponse(err)
+    }
     console.error('[api] erro inesperado:', err)
     return json({ error: { code: 'server_error', message: 'Algo deu errado do nosso lado. Tente de novo em instantes.' } }, 500)
   }

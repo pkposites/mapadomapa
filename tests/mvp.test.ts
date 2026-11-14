@@ -49,7 +49,7 @@ describe('Cadastro MVP: celular + senha, sem SMS', () => {
     expect((await query('SELECT 1 FROM sms_messages')).length + (await query('SELECT 1 FROM verification_codes')).length).toBe(0)
   })
   it('honeypot: campo oculto preenchido (robô) é recusado e nada é criado', async () => {
-    const r = await reg({ website: 'http://spam.example' })
+    const r = await reg({ contato_extra: 'http://spam.example' })
     expect(r.status).toBe(400)
     expect((await query('SELECT 1 FROM users')).length).toBe(0)
   })
