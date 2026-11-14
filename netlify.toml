@@ -29,3 +29,19 @@
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# ===== HOMOLOGAÇÃO (esta branch é a branch de produção do site de HOMOLOGAÇÃO) =====
+# O site OFICIAL (id abaixo) nunca deve construir esta branch: se ela aparecer lá como
+# branch deploy ou preview, o build é pulado (exit 0 = pular). No site de homologação
+# esta branch é produção, então estas regras não se aplicam.
+[context.branch-deploy]
+  ignore = "test \"$SITE_ID\" = \"9dd54e92-2593-4fd0-a4dc-70405aa94b0c\""
+
+[context.deploy-preview]
+  ignore = "test \"$SITE_ID\" = \"9dd54e92-2593-4fd0-a4dc-70405aa94b0c\""
+
+# Homologação nunca deve ser indexada.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
