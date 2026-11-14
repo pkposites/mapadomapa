@@ -8,6 +8,8 @@ import MuralPage from './pages/area/MuralPage'
 import Mensagens from './pages/area/Mensagens'
 import Pedidos from './pages/area/Pedidos'
 import Admin from './pages/Admin'
+import AdminDestaque from './pages/AdminDestaque'
+import Destaque from './pages/area/Destaque'
 import AdminMural from './pages/AdminMural'
 import { AdminComunicados, AdminMensagens } from './pages/AdminComunicacao'
 import Profissional from './pages/Profissional'
@@ -48,12 +50,14 @@ export default function App() {
         <Route path="/entrar" element={<Entrar />} />
         <Route path="/conta" element={<Navigate to="/area" replace />} />
         <Route path="/area" element={<RequireAuth><Inicio /></RequireAuth>} />
+        <Route path="/area/destaque" element={<RequireAuth><Destaque /></RequireAuth>} />
         <Route path="/area/mural" element={<RequireAuth><MuralPage /></RequireAuth>} />
         <Route path="/area/perfil" element={<RequireAuth><Perfil /></RequireAuth>} />
         <Route path="/area/mensagens" element={<RequireAuth><Mensagens /></RequireAuth>} />
         <Route path="/area/pedidos" element={<RequireAuth><Pedidos /></RequireAuth>} />
         <Route path="/profissional" element={<RequireAuth><Profissional /></RequireAuth>} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/destaque" element={<AdminDestaque />} />
         <Route path="/admin/mural" element={<AdminMural />} />
         <Route path="/admin/mensagens" element={<AdminMensagens />} />
         <Route path="/admin/comunicados" element={<AdminComunicados />} />

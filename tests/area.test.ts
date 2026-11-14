@@ -308,3 +308,24 @@ describe('Mural', () => {
     expect((await b.call('DELETE', `/pro/feed/${own}`)).status).toBe(200)
   })
 })
+
+describe('Interesse no Destaque', () => {
+  it('registra, valida, atualiza sem duplicar mensagem, remove; só admin lista; sem cobrança', async () => {
+    const admin = await mkAdmin(), a = await mkUser(), b = await mkUser()
+    expect((await api('GET', '/pro/boost')).status).toBe(401)
+    expect((await a.call('GET', '/pro/boost')).body.interest).toBeNull()
+    expect((await a.call('PUT', '/pro/boost', { budget: 'caro', priorities: ['primeiro'] })).body.error.code).toBe('invalid_budget')
+    expect((await a.call('PUT', '/pro/boost', { budget: 'ate_50', priorities: [] })).body.error.code).toBe('invalid_priorities')
+    expect((await a.call('PUT', '/pro/boost', { budget: 'ate_50', priorities: ['x'] })).body.error.code).toBe('invalid_priorities')
+    const r = await a.call('PUT', '/pro/boost', { budget: '50_100', priorities: ['primeiro', 'selo'], note: 'Quero aparecer na zona sul' })
+    expect(r.body.interest).toMatchObject({ budget: '50_100', priorities: ['primeiro', 'selo'], note: 'Quero aparecer na zona sul' })
+    await a.call('PUT', '/pro/boost', { budget: 'acima_200', priorities: ['avisos'] })
+    expect((await query<any>("SELECT 1 FROM messages WHERE user_id = $1 AND body LIKE '%plano de destaque%'", [a.id])).length).toBe(1) // 1 aviso para a equipe, mesmo editando
+    expect((await b.call('GET', '/pro/boost')).body.interest).toBeNull() // isolamento
+    expect((await a.call('GET', '/admin/boost')).status).toBe(403)
+    const adm = (await api('GET', '/admin/boost', { cookie: admin.cookie })).body
+    expect(adm).toMatchObject({ total: 1, totalProfessionals: 2 }); expect(adm.byBudget.acima_200).toBe(1); expect(adm.items[0].id).toBe(a.id)
+    expect((await a.call('DELETE', '/pro/boost')).body.interest).toBeNull()
+    expect((await api('GET', '/admin/boost', { cookie: admin.cookie })).body.total).toBe(0)
+  })
+})

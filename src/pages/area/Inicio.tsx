@@ -6,6 +6,7 @@ import InstallPrompt from '../../area/InstallPrompt'
 import ShareCard from '../../area/ShareCard'
 import PushCard from '../../area/PushCard'
 import Mural from '../../area/Mural'
+import BoostCard from '../../area/BoostCard'
 import Spinner from '../../components/ui/Spinner'
 import Alert from '../../components/ui/Alert'
 import { api } from '../../lib/api'
@@ -76,6 +77,8 @@ export default function Inicio() {
               </section>
             )
           })}
+
+          <BoostCard />
 
           <Mural compact />
 

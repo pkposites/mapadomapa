@@ -14,6 +14,7 @@ import { loadSession, requireAdmin, requireUser, revokeSession } from './lib/ses
 import * as pro from './pro/service'
 import * as area from './pro/area'
 import * as feed from './pro/feed'
+import * as boost from './pro/boost'
 import * as adm from './admin/service'
 import * as auth from './services/auth'
 
@@ -140,6 +141,9 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (fp && method === 'PUT' && fp[2] === '/like') return json(await feed.setLike(me.userId, fp[1], (await readJson(req)).liked === true))
     if (fp && method === 'GET' && fp[2] === '/comments') return json(await feed.listComments(me.userId, fp[1]))
     if (fp && method === 'POST' && fp[2] === '/comments') return json(await feed.addComment(me.userId, fp[1], await readJson(req)))
+    if (method === 'GET' && path === '/pro/boost') return json(await boost.getBoost(me.userId))
+    if (method === 'PUT' && path === '/pro/boost') return json(await boost.setBoost(me.userId, await readJson(req)))
+    if (method === 'DELETE' && path === '/pro/boost') return json(await boost.removeBoost(me.userId))
     if (method === 'GET' && path === '/pro/push') return json(await area.pushStatus(me.userId))
     if (method === 'POST' && path === '/pro/push/subscribe') return json(await area.pushSubscribe(me.userId, await readJson(req)))
     if (method === 'PUT' && path === '/pro/push/prefs') return json(await area.pushPrefs(me.userId, await readJson(req)))
@@ -173,6 +177,7 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (m && method === 'POST' && m[2] === '/welcome') return json(await adm.sendWelcome(admin.userId, m[1], (await readJson(req)).body))
     if (method === 'GET' && path === '/admin/welcome') return json(await adm.welcomeInfo())
     if (method === 'POST' && path === '/admin/welcome-all') return json(await adm.sendWelcomeAll(admin.userId, (await readJson(req)).body))
+    if (method === 'GET' && path === '/admin/boost') return json(await boost.adminBoost())
     if (method === 'GET' && path === '/admin/feed') return json(await feed.adminFeed())
     const fac = path.match(/^\/admin\/feed\/(\d{1,15})\/comments$/)
     if (fac && method === 'GET') return json(await feed.adminComments(fac[1]))

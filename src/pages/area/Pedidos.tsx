@@ -1,6 +1,7 @@
 import { CalendarDays, Inbox } from 'lucide-react'
 import AreaShell from '../../area/Shell'
 import { SITE } from '../../config/site'
+import BoostCard from '../../area/BoostCard'
 
 /** Seção preparada para a evolução do marketplace. Nada aqui recebe pedidos reais. */
 export default function Pedidos() {
@@ -17,6 +18,7 @@ export default function Pedidos() {
         <p className="mt-3 text-[17px] font-semibold">Nenhum pedido ainda</p>
         <p className="mt-1 text-[15px] leading-snug text-muted">Quando os pedidos abrirem, os orçamentos solicitados na sua região aparecerão aqui. Mantenha seu perfil completo e seu cadastro aprovado.</p>
       </section>
+      <div className="mt-5"><BoostCard /></div>
     </AreaShell>
   )
 }
