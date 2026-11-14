@@ -63,6 +63,44 @@ describe('Homologação válida: simuladores liberados, mas nada externo', () =>
   })
 })
 
+describe('Credenciais injetadas automaticamente pela Netlify (AI Gateway)', () => {
+  const GW = { OPENAI_API_KEY: 'chave-do-ai-gateway-injetada', OPENAI_BASE_URL: 'https://ai-gateway.netlify.example/v1', ANTHROPIC_API_KEY: 'x', GEMINI_API_KEY: 'y' }
+  it('OPENAI_API_KEY (e demais chaves do gateway) NÃO derrubam a homologação: cadastro e simulador de SMS funcionam', async () => {
+    asStaging(GW)
+    const r = await register()
+    expect(r.status).toBe(200)
+    const sms = await call('GET', '/dev/sms')
+    expect(sms.status).toBe(200)
+    expect(sms.body.messages[0].body).toMatch(/\b\d{6}\b/)
+  })
+  it('mesmo com a chave presente, NADA é chamado fora: nem OpenAI, nem Meta, nem Cloudflare', async () => {
+    asStaging(GW)
+    const external: string[] = []
+    globalThis.fetch = (async (u: any, i: any) => { if (/^https?:/.test(String(u))) external.push(String(u)); return realFetch(u, i) }) as typeof fetch
+    await register()
+    runInRequestContext(HOST, () => { expect(aiMode()).toBe('sim'); expect(metaMode()).toBe('sim') })
+    expect(external).toHaveLength(0)
+  })
+  it('a avaliação por IA continua SIMULADA no envio do cadastro profissional (a chave do gateway não é usada)', async () => {
+    asStaging(GW)
+    const external: string[] = []
+    globalThis.fetch = (async (u: any, i: any) => { if (/^https?:/.test(String(u))) external.push(String(u)); return realFetch(u, i) }) as typeof fetch
+    const { evaluateOpenAnswer } = await import('../server/ai')
+    const out = await runInRequestContext(HOST, () => evaluateOpenAnswer('pintores', 'Pintores', 'Eu lixo a parede, passo selador e duas demãos com rolo.'))
+    expect(out).toMatchObject({ status: 'ok', provider: 'sim' })
+    expect(external).toHaveLength(0)
+  })
+  it('FORA da homologação (produção comum) a chave sozinha também não liga a IA: exige AI_PROVIDER=openai + modelo', () => {
+    asStaging(); delete process.env.APP_ENV; Object.assign(process.env, GW)
+    expect(aiMode()).toBe('off')
+  })
+  it('escolher a OpenAI de forma explícita (AI_PROVIDER=openai) continua derrubando a homologação', async () => {
+    asStaging({ ...GW, AI_PROVIDER: 'openai' })
+    expect((await call('GET', '/dev/sms')).status).toBe(404)
+    expect([403, 503]).toContain((await register()).status)
+  })
+})
+
 describe('Homologação INVÁLIDA = comporta-se como produção (falha fechada)', () => {
   const blocked = async (label: string) => {
     expect((await call('GET', '/dev/sms')).status, `${label}: /dev/sms`).toBe(404)
@@ -74,7 +112,7 @@ describe('Homologação INVÁLIDA = comporta-se como produção (falha fechada)'
   it('sem STAGING_HOSTNAME', async () => { asStaging({ STAGING_HOSTNAME: '' }); await blocked('sem hostname') })
   it('APP_ENV diferente de staging', async () => { asStaging({ APP_ENV: 'production' }); await blocked('APP_ENV') })
   it.each([
-    ['OPENAI_API_KEY', 'sk-falsa'], ['META_CAPI_ACCESS_TOKEN', 'x'.repeat(30)], ['TURNSTILE_SECRET_KEY', 'y'.repeat(20)],
+    ['META_CAPI_ACCESS_TOKEN', 'x'.repeat(30)], ['TURNSTILE_SECRET_KEY', 'y'.repeat(20)],
     ['SMS_PROVIDER', 'zenvia'], ['AI_PROVIDER', 'openai'], ['CAPTCHA_PROVIDER', 'turnstile'],
   ])('presença de %s (credencial/serviço real) derruba o modo homologação', async (k, v) => { asStaging({ [k]: v }); await blocked(k) })
   it('produção comum (sem APP_ENV) continua sem simuladores', async () => {
