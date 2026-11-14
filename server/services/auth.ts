@@ -1,6 +1,6 @@
 import { addSeconds, now } from '../lib/clock'
 import { isUniqueViolation, query, withTransaction } from '../lib/db'
-import { isPreRegistrationOpen, POLICY } from '../lib/env'
+import { adminBootstrapPhones, isPreRegistrationOpen, passwordRecoveryEnabled, POLICY, verificationMode } from '../lib/env'
 import { verifyCaptcha } from '../lib/captcha'
 import { ApiError } from '../lib/http'
 import { audit } from '../lib/audit'
@@ -27,6 +27,7 @@ const passwordOrThrow = (v: unknown): string => {
   if (problem) throw new ApiError(400, 'weak_password', problem)
   return v as string
 }
+const featureDisabled = () => new ApiError(404, 'feature_disabled', 'Este recurso não está disponível nesta fase.')
 const phoneTaken = () =>
   new ApiError(409, 'phone_taken', 'Esse celular já tem cadastro. Entre com a sua senha ou recupere o acesso.')
 
@@ -40,18 +41,55 @@ const findByPhone = async (e164: string): Promise<PhoneUser | undefined> =>
     )
   )[0]
 
-/** 1) Cria a conta (pendente) e envia o código por SMS. */
+/**
+ * MVP (sem SMS/WhatsApp): a conta já nasce ATIVA e logada, com o celular NÃO VERIFICADO.
+ * Só um administrador marca o celular como verificado.
+ */
+async function registerWithoutSms(phone: string, password: string, bootstrap: boolean, ctx: Ctx) {
+  if (await findByPhone(phone)) throw phoneTaken()
+  const hash = await hashPassword(password)
+  let userId: string
+  try {
+    userId = await withTransaction(async (c) => {
+      const u = await c.query<{ id: string }>("INSERT INTO users (status, password_hash, terms_accepted_at) VALUES ('active', $1, $2) RETURNING id", [hash, now()])
+      const id = u.rows[0].id
+      await c.query('INSERT INTO phones (user_id, e164) VALUES ($1, $2)', [id, phone]) // verified_at fica NULO
+      await c.query('INSERT INTO profiles (user_id) VALUES ($1)', [id])
+      await c.query("INSERT INTO user_roles (user_id, role_id) SELECT $1, id FROM roles WHERE name = 'user'", [id])
+      if (bootstrap) {
+        // Primeiro administrador: só se ainda não existir nenhum.
+        const has = await c.query("SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.name = 'admin' LIMIT 1")
+        if (has.rows.length === 0) await c.query("INSERT INTO user_roles (user_id, role_id) SELECT $1, id FROM roles WHERE name = 'admin'", [id])
+      }
+      return id
+    })
+  } catch (e) {
+    if (isUniqueViolation(e)) throw phoneTaken()
+    throw e
+  }
+  const session = await createSession(userId, ctx)
+  await audit('signup.completed', { userId, ip: ctx.ip, details: { mode: 'admin', phone: maskPhone(phone), bootstrap } })
+  return { session, body: { ok: true as const, mode: 'admin' as const } }
+}
+
+/** 1) (modo SMS) Cria a conta (pendente) e envia o código por SMS. */
 export async function register(body: Body, ctx: Ctx) {
   const phone = phoneOrThrow(body.phone)
   const password = passwordOrThrow(body.password)
   if (body.acceptTerms !== true) {
     throw new ApiError(400, 'terms_required', 'Para continuar, marque que você leu e aceita os Termos de Uso e a Política de Privacidade.')
   }
-  if (!isPreRegistrationOpen()) {
+  // Campo-isca (honeypot): pessoas não veem nem preenchem; robôs costumam preencher.
+  if (typeof body.website === 'string' && body.website.trim() !== '') {
+    throw new ApiError(400, 'bad_request', 'Pedido inválido. Atualize a página e tente de novo.')
+  }
+  const bootstrap = verificationMode() === 'admin' && adminBootstrapPhones().includes(phone)
+  if (!isPreRegistrationOpen() && !bootstrap) {
     throw new ApiError(403, 'preregistration_closed', 'O pré-cadastro ainda não abriu. Volte em breve!')
   }
   await enforce(`register:ip:${ctx.ip ?? 'unknown'}`, POLICY.registerPerIp.limit, POLICY.registerPerIp.windowSeconds)
   await verifyCaptcha(body.captchaToken, ctx.ip)
+  if (verificationMode() === 'admin') return registerWithoutSms(phone, password, bootstrap, ctx)
 
   const existing = await findByPhone(phone)
   if (existing?.verified_at) throw phoneTaken()
@@ -86,6 +124,7 @@ export async function register(body: Body, ctx: Ctx) {
 
 /** 2) Confirma o celular com o código e já deixa o usuário logado. */
 export async function verifyPhone(body: Body, ctx: Ctx) {
+  if (verificationMode() === 'admin') throw featureDisabled()
   const phone = phoneOrThrow(body.phone)
   await enforce(`verify:phone:${phone}`, POLICY.verifyPerPhone.limit, POLICY.verifyPerPhone.windowSeconds)
   await consumeCode('signup', phone, body.code)
@@ -122,6 +161,7 @@ export async function verifyPhone(body: Body, ctx: Ctx) {
 
 /** Reenvia o código de confirmação do cadastro (somente para números ainda não confirmados). */
 export async function resendSignupCode(body: Body, ctx: Ctx) {
+  if (verificationMode() === 'admin') throw featureDisabled()
   const phone = phoneOrThrow(body.phone)
   await enforce(`resend:ip:${ctx.ip ?? 'unknown'}`, POLICY.recoveryPerIp.limit, POLICY.recoveryPerIp.windowSeconds)
   await verifyCaptcha(body.captchaToken, ctx.ip)
@@ -157,7 +197,7 @@ export async function login(body: Body, ctx: Ctx) {
   if (found.status === 'disabled') {
     throw new ApiError(403, 'account_disabled', 'Esta conta está bloqueada. Fale com o suporte do Mapa do Mapa.')
   }
-  if (!found.verified_at) {
+  if (!found.verified_at && verificationMode() === 'sms') {
     // Senha certa, mas o celular nunca foi confirmado: manda um código novo para concluir o cadastro.
     await issueCode('signup', phone, ctx.ip, { silentOnLimit: true })
     throw new ApiError(403, 'phone_not_verified', 'Falta confirmar o seu celular. Enviamos um código por SMS.', {
@@ -176,6 +216,7 @@ export async function login(body: Body, ctx: Ctx) {
 
 /** Recuperação, passo 1: envia o código. Resposta sempre igual, exista ou não o número. */
 export async function forgotPassword(body: Body, ctx: Ctx) {
+  if (!passwordRecoveryEnabled()) throw featureDisabled()
   const phone = phoneOrThrow(body.phone)
   await enforce(`recovery:ip:${ctx.ip ?? 'unknown'}`, POLICY.recoveryPerIp.limit, POLICY.recoveryPerIp.windowSeconds)
   await verifyCaptcha(body.captchaToken, ctx.ip)
@@ -191,6 +232,7 @@ export async function forgotPassword(body: Body, ctx: Ctx) {
 
 /** Recuperação, passo 2: confere o código, troca a senha e encerra todas as sessões antigas. */
 export async function resetPassword(body: Body, ctx: Ctx) {
+  if (!passwordRecoveryEnabled()) throw featureDisabled()
   const phone = phoneOrThrow(body.phone)
   const password = passwordOrThrow(body.password) // valida antes, para não gastar o código à toa
   await enforce(`verify:phone:${phone}`, POLICY.verifyPerPhone.limit, POLICY.verifyPerPhone.windowSeconds)
@@ -213,6 +255,7 @@ export const meBody = (u: SessionUser) => ({
     id: u.userId,
     phone: formatNational(u.phone),
     phoneMasked: maskPhone(u.phone),
+    phoneVerified: u.phoneVerified,
     roles: u.roles,
     isAdmin: u.roles.includes('admin'),
   },

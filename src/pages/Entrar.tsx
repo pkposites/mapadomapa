@@ -54,9 +54,6 @@ export default function Entrar() {
         <PhoneField id="phone" label="Seu celular" value={phone} onChange={setPhone} error={errors.phone} autoFocus />
         <PasswordField id="password" label="Senha" value={password} onChange={setPassword} error={errors.password} />
         <SubmitButton type="submit" loading={busy}>Entrar</SubmitButton>
-        <p className="text-center text-[15px]">
-          <Link to="/recuperar-senha" className={standaloneLink}>Esqueci minha senha</Link>
-        </p>
       </form>
     </AuthShell>
   )

@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Landing from './pages/Landing'
 import Entrar from './pages/Entrar'
-import RecuperarSenha from './pages/RecuperarSenha'
 import Conta from './pages/Conta'
 import Admin from './pages/Admin'
 import Profissional from './pages/Profissional'
@@ -40,7 +39,6 @@ export default function App() {
         <Route path={SITE.privacyPath} element={<Privacidade />} />
         <Route path={SITE.termsPath} element={<Termos />} />
         <Route path="/entrar" element={<Entrar />} />
-        <Route path="/recuperar-senha" element={<RecuperarSenha />} />
         <Route path="/conta" element={<RequireAuth><Conta /></RequireAuth>} />
         <Route path="/profissional" element={<RequireAuth><Profissional /></RequireAuth>} />
         <Route path="/admin" element={<Admin />} />

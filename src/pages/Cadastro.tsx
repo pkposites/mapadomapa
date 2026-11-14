@@ -3,13 +3,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AlertCircle } from 'lucide-react'
 import AuthShell, { linkClass, standaloneLink } from '../components/AuthShell'
 import Alert from '../components/ui/Alert'
-import CaptchaField, { captchaEnabled } from '../components/ui/CaptchaField'
+import CaptchaField, { type CaptchaMode } from '../components/ui/CaptchaField'
 import { CodeField, PasswordField, PhoneField } from '../components/ui/Field'
 import SubmitButton from '../components/ui/SubmitButton'
 import Button from '../components/Button'
 import Spinner from '../components/ui/Spinner'
 import { useAuth } from '../auth/AuthContext'
 import { api, ApiError } from '../lib/api'
+import { getStatus } from '../lib/status'
 import { isPhoneComplete } from '../lib/phone'
 import { mmss, useCooldown } from '../hooks/useCooldown'
 import { SITE } from '../config/site'
@@ -49,10 +50,13 @@ export default function Cadastro() {
   const [captcha, setCaptcha] = useState<string | null>(null)
   const [captchaReset, setCaptchaReset] = useState(0)
   const [open, setOpen] = useState<boolean | null>(null) // pré-cadastro aberto?
+  const [vmode, setVmode] = useState<'admin' | 'sms'>('admin') // como o celular é verificado
+  const [captchaMode, setCaptchaMode] = useState<CaptchaMode>(null)
+  const [hp, setHp] = useState('') // campo-isca anti-robô (pessoas nunca veem)
 
   useEffect(() => {
     if (state.resendIn) startCooldown(state.resendIn) // veio do login: respeita o intervalo do último SMS
-    api.get<{ preRegistrationOpen: boolean }>('/status').then((s) => setOpen(s.preRegistrationOpen)).catch(() => setOpen(true))
+    getStatus().then((s) => { setOpen(s.preRegistrationOpen); setVmode(s.verificationMode) }).catch(() => setOpen(true))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -73,12 +77,17 @@ export default function Cadastro() {
     if (!isPhoneComplete(phone)) next.phone = 'Digite o celular com DDD. Exemplo: (11) 91234-5678.'
     if (password.length < 8) next.password = 'Use pelo menos 8 caracteres na senha.'
     if (!accepted) next.terms = 'Marque que você leu e aceita para continuar.'
-    if (captchaEnabled && !captcha) next.captcha = CAPTCHA_MSG
+    if (captchaMode && !captcha) next.captcha = captchaMode === 'pow' ? 'Verificando a segurança… aguarde um instante e toque em Continuar de novo.' : CAPTCHA_MSG
     setErrors(next)
     if (Object.keys(next).length) return
     setBusy(true)
     try {
-      const r = await api.post<Registered>('/auth/register', { phone, password, acceptTerms: true, captchaToken: captcha })
+      const r = await api.post<Registered | { ok: true; mode: 'admin' }>('/auth/register', { phone, password, acceptTerms: true, captchaToken: captcha, website: hp })
+      if ('mode' in r) { // MVP: conta criada e já logada; o celular será verificado pela equipe
+        await refresh()
+        navigate('/profissional', { replace: true })
+        return
+      }
       startCooldown(r.resendIn)
       setNotice(null)
       setStep('code')
@@ -115,7 +124,7 @@ export default function Cadastro() {
   }
 
   const resend = async () => {
-    if (captchaEnabled && !captcha) return setErrors({ captcha: CAPTCHA_MSG })
+    if (captchaMode && !captcha) return setErrors({ captcha: CAPTCHA_MSG })
     setBusy(true)
     setErrors({})
     try {
@@ -181,7 +190,9 @@ export default function Cadastro() {
     <AuthShell
       eyebrow="Pré-cadastro gratuito"
       title="Crie sua conta"
-      subtitle={<>Só precisamos do seu celular e de uma senha. Não pedimos e-mail. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>}
+      subtitle={vmode === 'admin'
+        ? <>Só precisamos do seu celular e de uma senha. Sua conta é criada na hora e o celular é verificado depois pela nossa equipe. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>
+        : <>Só precisamos do seu celular e de uma senha. Não pedimos e-mail. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>}
       below={<>Já tem conta? <Link to="/entrar" className={standaloneLink}>Entrar</Link></>}
     >
       <form onSubmit={submitForm} noValidate className="space-y-5">
@@ -191,7 +202,7 @@ export default function Cadastro() {
             {errors.form.includes('já tem cadastro') && <Link to="/entrar" className={linkClass}>Entrar</Link>}
           </Alert>
         )}
-        <PhoneField id="phone" label="Seu celular" hint="Vamos enviar um código por SMS para confirmar." value={phone} onChange={setPhone} error={errors.phone} autoFocus />
+        <PhoneField id="phone" label="Seu celular" hint={vmode === 'admin' ? 'Usamos para a equipe falar com você.' : 'Vamos enviar um código por SMS para confirmar.'} value={phone} onChange={setPhone} error={errors.phone} autoFocus />
         <PasswordField id="password" label="Crie uma senha" hint="Pelo menos 8 caracteres." value={password} onChange={setPassword} error={errors.password} autoComplete="new-password" />
 
         <div>
@@ -219,8 +230,11 @@ export default function Cadastro() {
           )}
         </div>
 
-        <CaptchaField onToken={setCaptcha} resetSignal={captchaReset} error={errors.captcha} />
-        <SubmitButton type="submit" loading={busy}>Continuar</SubmitButton>
+        <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+          <label>Não preencha este campo<input type="text" name="website" tabIndex={-1} autoComplete="off" value={hp} onChange={(e) => setHp(e.target.value)} /></label>
+        </div>
+        <CaptchaField onToken={setCaptcha} onMode={setCaptchaMode} resetSignal={captchaReset} error={errors.captcha} />
+        <SubmitButton type="submit" loading={busy}>{vmode === 'admin' ? 'Criar minha conta' : 'Continuar'}</SubmitButton>
       </form>
     </AuthShell>
   )
