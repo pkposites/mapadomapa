@@ -73,7 +73,12 @@ export function isLocalDatabaseUrl(url: string): boolean {
 //   3. NENHUMA credencial de produção/serviço pago presente no ambiente (ver FORBIDDEN_IN_STAGING).
 // O acesso ao site também deve estar protegido por senha na Netlify (isso é configurado fora do código).
 // ---------------------------------------------------------------------------------------------
-const FORBIDDEN_IN_STAGING = ['META_CAPI_ACCESS_TOKEN', 'OPENAI_API_KEY', 'TURNSTILE_SECRET_KEY'] as const
+// OPENAI_API_KEY NÃO está nesta lista de propósito: a Netlify (AI Gateway) injeta essa variável
+// sozinha em todos os sites, sem ninguém configurar. A presença dela não é uma escolha nossa.
+// A proteção real contra gasto com IA é outra, e continua valendo:
+//   - em homologação aiMode() devolve SEMPRE 'sim' (nunca lê nem usa a chave);
+//   - fora dela, a OpenAI só é chamada com AI_PROVIDER=openai explícito (também proibido aqui).
+const FORBIDDEN_IN_STAGING = ['META_CAPI_ACCESS_TOKEN', 'TURNSTILE_SECRET_KEY'] as const
 
 export type StagingCheck = { ok: true } | { ok: false; reason: string }
 export function checkStaging(requestHost: string | null | undefined): StagingCheck {
