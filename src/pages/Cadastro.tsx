@@ -191,7 +191,7 @@ export default function Cadastro() {
       eyebrow="Pré-cadastro gratuito"
       title="Crie sua conta"
       subtitle={vmode === 'admin'
-        ? <>Só precisamos do seu celular e de uma senha. Sua conta é criada na hora e o celular é verificado depois pela nossa equipe. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>
+        ? <>Só precisamos do seu celular e de uma senha. Sua conta é criada na hora, o celular é verificado depois pela nossa equipe e seu perfil fica em análise até a aprovação. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>
         : <>Só precisamos do seu celular e de uma senha. Não pedimos e-mail. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>}
       below={<>Já tem conta? <Link to="/entrar" className={standaloneLink}>Entrar</Link></>}
     >

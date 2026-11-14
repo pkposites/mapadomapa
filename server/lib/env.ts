@@ -45,7 +45,7 @@ export const POLICY = {
 /**
  * Pré-cadastro (criação de contas) aberto?
  * Local: aberto. Produção: FECHADO por padrão — só abre com PRE_REGISTRATION_OPEN=true.
- * (Diferente da abertura dos PEDIDOS de orçamento, prevista para 25/12/2026.)
+ * (Diferente da abertura dos PEDIDOS de orçamento, prevista para 25/11/2026.)
  */
 export function isPreRegistrationOpen(): boolean {
   const v = env('PRE_REGISTRATION_OPEN')

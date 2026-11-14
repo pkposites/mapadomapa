@@ -4,7 +4,7 @@ const SECTIONS: LegalSection[] = [
   {
     title: 'Sobre o serviço',
     body: [
-      'O Mapa do Mapa é uma plataforma que pretende aproximar profissionais autônomos de clientes que buscam orçamentos de serviços em São Paulo. O pré-cadastro de profissionais é gratuito e a abertura dos pedidos de orçamento está prevista para 25/12/2026.',
+      'O Mapa do Mapa é uma plataforma que pretende aproximar profissionais autônomos de clientes que buscam orçamentos de serviços em São Paulo. O pré-cadastro de profissionais é gratuito e a abertura dos pedidos de orçamento está prevista para 25/11/2026.',
     ],
     pending: 'Descrição jurídica precisa do serviço e do papel da plataforma (intermediação, sem vínculo com a prestação do serviço?).',
   },

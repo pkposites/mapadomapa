@@ -2,12 +2,12 @@ export const SITE = {
   name: 'Mapa do Mapa',
   city: 'São Paulo',
   /**
-   * Abertura dos PEDIDOS de orçamento (clientes pedindo, profissionais respondendo): 25/12/2026,
+   * Abertura dos PEDIDOS de orçamento (clientes pedindo, profissionais respondendo): 25/11/2026,
    * 00:00 no horário de Brasília. NÃO é a abertura do pré-cadastro — esse é controlado pelo
    * servidor (PRE_REGISTRATION_OPEN) e pode abrir antes.
    */
-  requestsOpenDate: new Date('2026-12-25T00:00:00-03:00'),
-  requestsOpenLabel: '25/12/2026',
+  requestsOpenDate: new Date('2026-11-25T00:00:00-03:00'),
+  requestsOpenLabel: '25/11/2026',
   signupPath: '/cadastro',
   ctaLabel: 'Quero me cadastrar',
   instagramUrl: 'https://www.instagram.com/mapadomapa/',

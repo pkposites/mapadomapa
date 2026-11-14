@@ -38,8 +38,8 @@ export default function LaunchCta() {
                 )}
               </p>
               <p className="mt-6 max-w-md text-[17px] leading-relaxed text-on-dark md:text-lg">
-                O pré-cadastro é gratuito: cadastre-se agora e saia na frente quando os pedidos de orçamento começarem em{' '}
-                {SITE.city}.
+                O pré-cadastro de profissionais está aberto agora e é gratuito. Cadastre-se e saia na frente: os pedidos de orçamento em{' '}
+                {SITE.city} começam em {SITE.requestsOpenLabel}.
               </p>
             </div>
 

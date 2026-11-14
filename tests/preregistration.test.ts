@@ -13,7 +13,7 @@ afterEach(() => {
 })
 const reg = () => api('POST', '/auth/register', { body: { phone: PHONE, password: PASSWORD, acceptTerms: true } })
 
-describe('Pré-cadastro x abertura dos pedidos (25/12/2026)', () => {
+describe('Pré-cadastro x abertura dos pedidos (25/11/2026)', () => {
   it('localmente o pré-cadastro está aberto', async () => {
     expect((await api('GET', '/status')).body).toMatchObject({ preRegistrationOpen: true })
     expect((await reg()).status).toBe(200)
