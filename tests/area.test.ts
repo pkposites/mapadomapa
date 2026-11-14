@@ -226,3 +226,49 @@ describe('Notificações push', () => {
     expect((await a.call('GET', '/pro/push')).body.subscribed).toBe(false)
   })
 })
+
+describe('Mural', () => {
+  async function approvedUser(admin: Awaited<ReturnType<typeof mkUser>>, name: string) {
+    const u = await mkUser(); await u.call('PUT', '/pro/me', { fullName: name }); await submitted(u)
+    await api('POST', `/admin/professionals/${u.id}/decision`, { cookie: admin.cookie, body: { action: 'approve' } }); return u
+  }
+  it('só aprovados leem/publicam; ninguém recebe id, celular ou perfil de outro; validações', async () => {
+    const admin = await mkAdmin(), a = await approvedUser(admin, 'Ana Souza'), b = await approvedUser(admin, 'Bruno Dias'), pend = await mkUser()
+    expect((await api('GET', '/pro/feed')).status).toBe(401)
+    expect((await pend.call('GET', '/pro/feed')).body).toMatchObject({ allowed: false, items: [] })
+    expect((await pend.call('POST', '/pro/feed', { body: 'oi pessoal' })).status).toBe(403)
+    expect((await a.call('POST', '/pro/feed', { body: 'oi' })).body.error.code).toBe('invalid_post')
+    expect((await a.call('POST', '/pro/feed', { body: 'x'.repeat(601) })).body.error.code).toBe('post_too_long')
+    for (const t of ['me chama no 11 99999-8888 pra orçamento', 'veja www.meusite.com', 'https://x.io/abc', 'meu site é pintura.com.br']) expect((await a.call('POST', '/pro/feed', { body: t })).body.error.code, t).toBe('post_contact_info')
+    expect((await a.call('POST', '/pro/feed', { body: 'Alguém indica um bom fornecedor de tinta na Zona Sul?' })).status).toBe(200)
+    const seen = (await b.call('GET', '/pro/feed')).body
+    expect(seen.items).toHaveLength(1)
+    expect(seen.items[0]).toMatchObject({ name: 'Ana Souza', professions: ['Pintores'], body: 'Alguém indica um bom fornecedor de tinta na Zona Sul?', mine: false })
+    expect(Object.keys(seen.items[0]).sort()).toEqual(['at', 'body', 'id', 'mine', 'name', 'professions'])
+    expect(JSON.stringify(seen)).not.toMatch(new RegExp(`${a.id}|\\+55|11 9`)) // nenhum id de usuário nem celular
+    expect((await b.call('GET', `/pro/me`)).body.fullName).toBe('Bruno Dias') // não existe rota para ler perfil alheio
+  })
+  it('denunciar, ocultar (admin), excluir a própria; autor suspenso some do mural; sem nome não publica', async () => {
+    const admin = await mkAdmin(), a = await approvedUser(admin, 'Ana Souza'), b = await approvedUser(admin, 'Bruno Dias')
+    await a.call('POST', '/pro/feed', { body: 'Primeira postagem de teste' })
+    const id = (await b.call('GET', '/pro/feed')).body.items[0].id
+    expect((await a.call('POST', `/pro/feed/${id}/report`)).body.error.code).toBe('own_post')
+    expect((await b.call('POST', `/pro/feed/${id}/report`)).status).toBe(200)
+    expect((await b.call('DELETE', `/pro/feed/${id}`)).status).toBe(404) // não apaga a de outra pessoa
+    expect((await b.call('PUT', `/admin/feed/${id}`, { hidden: true })).status).toBe(403)
+    const adm = (await api('GET', '/admin/feed', { cookie: admin.cookie })).body.items[0]
+    expect(adm).toMatchObject({ reports: 1, authorName: 'Ana Souza', hidden: false })
+    await api('PUT', `/admin/feed/${id}`, { cookie: admin.cookie, body: { hidden: true, reason: 'fora das regras' } })
+    expect((await b.call('GET', '/pro/feed')).body.items).toHaveLength(0)
+    await api('PUT', `/admin/feed/${id}`, { cookie: admin.cookie, body: { hidden: false } })
+    expect((await b.call('GET', '/pro/feed')).body.items).toHaveLength(1)
+    await api('POST', `/admin/professionals/${a.id}/decision`, { cookie: admin.cookie, body: { action: 'suspend', notes: 'teste de suspensão' } })
+    expect((await b.call('GET', '/pro/feed')).body.items).toHaveLength(0) // suspenso deixa de aparecer
+    const noName = await mkUser(); await submitted(noName)
+    await api('POST', `/admin/professionals/${noName.id}/decision`, { cookie: admin.cookie, body: { action: 'approve' } })
+    expect((await noName.call('GET', '/pro/feed')).body).toMatchObject({ allowed: true, canPost: false, needsName: true })
+    expect((await noName.call('POST', '/pro/feed', { body: 'sem nome ainda' })).body.error.code).toBe('name_required')
+    const own = (await b.call('POST', '/pro/feed', { body: 'Minha postagem para apagar' })).body.items[0].id
+    expect((await b.call('DELETE', `/pro/feed/${own}`)).status).toBe(200)
+  })
+})

@@ -7,6 +7,7 @@ import Perfil from './pages/area/Perfil'
 import Mensagens from './pages/area/Mensagens'
 import Pedidos from './pages/area/Pedidos'
 import Admin from './pages/Admin'
+import AdminMural from './pages/AdminMural'
 import { AdminComunicados, AdminMensagens } from './pages/AdminComunicacao'
 import Profissional from './pages/Profissional'
 import AdminProfissional from './pages/AdminProfissional'
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/area/pedidos" element={<RequireAuth><Pedidos /></RequireAuth>} />
         <Route path="/profissional" element={<RequireAuth><Profissional /></RequireAuth>} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/mural" element={<AdminMural />} />
         <Route path="/admin/mensagens" element={<AdminMensagens />} />
         <Route path="/admin/comunicados" element={<AdminComunicados />} />
         <Route path="/admin/profissionais/:id" element={<AdminProfissional />} />

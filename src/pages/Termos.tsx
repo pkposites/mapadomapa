@@ -32,7 +32,7 @@ const SECTIONS: LegalSection[] = [
   {
     title: 'Uso adequado',
     body: [
-      'É proibido usar a plataforma para fraudes, informações falsas, assédio ou qualquer atividade ilegal. Contas poderão ser suspensas em caso de descumprimento.',
+      'É proibido usar a plataforma para fraudes, informações falsas, assédio ou qualquer atividade ilegal. No mural dos profissionais, não é permitido divulgar telefones, e-mails ou links, e a equipe pode ocultar postagens que descumpram as regras. Contas poderão ser suspensas em caso de descumprimento.',
     ],
     pending: 'Critérios e processo de suspensão ou exclusão de contas.',
   },

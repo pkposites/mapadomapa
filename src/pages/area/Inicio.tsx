@@ -5,6 +5,7 @@ import AreaShell from '../../area/Shell'
 import InstallPrompt from '../../area/InstallPrompt'
 import ShareCard from '../../area/ShareCard'
 import PushCard from '../../area/PushCard'
+import Mural from '../../area/Mural'
 import Spinner from '../../components/ui/Spinner'
 import Alert from '../../components/ui/Alert'
 import { api } from '../../lib/api'
@@ -49,6 +50,9 @@ export default function Inicio() {
             )}
           </section>
 
+          <InstallPrompt />
+          <PushCard />
+
           {user?.isAdmin && (
             <Link to="/admin" className="flex min-h-14 items-center gap-3 rounded-2xl bg-graphite px-5 font-semibold text-white"><ShieldCheck size={20} aria-hidden="true" /> Painel administrativo <ArrowRight size={18} className="ml-auto" aria-hidden="true" /></Link>
           )}
@@ -72,6 +76,8 @@ export default function Inicio() {
               </section>
             )
           })}
+
+          <Mural />
 
           <div className="grid grid-cols-3 gap-3">
             {[
@@ -112,8 +118,6 @@ export default function Inicio() {
           </details>
 
           <ShareCard />
-          <InstallPrompt />
-          <PushCard />
         </div>
       )}
     </AreaShell>

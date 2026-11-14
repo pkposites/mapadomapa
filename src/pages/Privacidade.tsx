@@ -19,7 +19,7 @@ const SECTIONS: LegalSection[] = [
   {
     title: 'Quem vê seus dados',
     body: [
-      'A equipe do Mapa do Mapa analisa cada cadastro e decide se aprova, pede ajustes, rejeita ou suspende. Nenhum perfil é exibido ao público sem aprovação da equipe. Seu celular, sua senha e suas respostas do questionário não são públicos.',
+      'A equipe do Mapa do Mapa analisa cada cadastro e decide se aprova, pede ajustes, rejeita ou suspende. Nenhum perfil é exibido ao público sem aprovação da equipe. Seu celular, sua senha e suas respostas do questionário não são públicos. Se você publicar no mural dos profissionais, seu nome, suas profissões e o texto da postagem ficam visíveis a outros profissionais aprovados (o mural não dá acesso ao perfil de ninguém).',
       'Quando os pedidos de orçamento começarem, parte dos dados de profissionais aprovados poderá ser exibida a clientes interessados nos serviços.',
     ],
     pending: 'Quais dados exatos serão exibidos a clientes quando os pedidos abrirem.',

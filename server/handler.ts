@@ -13,6 +13,7 @@ import { parseBrazilMobile } from './lib/phone'
 import { loadSession, requireAdmin, requireUser, revokeSession } from './lib/sessions'
 import * as pro from './pro/service'
 import * as area from './pro/area'
+import * as feed from './pro/feed'
 import * as adm from './admin/service'
 import * as auth from './services/auth'
 
@@ -129,6 +130,11 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (method === 'PUT' && path === '/pro/work') return json(await pro.setWork(me.userId, await readJson(req)))
     if (method === 'PUT' && path === '/pro/answers') return json(await pro.saveAnswers(me.userId, await readJson(req)))
     if (method === 'POST' && path === '/pro/submit') return json(await pro.submit(me.userId, ctx.ip))
+    if (method === 'GET' && path === '/pro/feed') return json(await feed.listFeed(me.userId, url.searchParams.get('before')))
+    if (method === 'POST' && path === '/pro/feed') return json(await feed.createPost(me.userId, await readJson(req)))
+    const fp = path.match(/^\/pro\/feed\/(\d{1,15})(\/report)?$/)
+    if (fp && method === 'DELETE' && !fp[2]) return json(await feed.deleteOwnPost(me.userId, fp[1]))
+    if (fp && method === 'POST' && fp[2]) return json(await feed.reportPost(me.userId, fp[1]))
     if (method === 'GET' && path === '/pro/push') return json(await area.pushStatus(me.userId))
     if (method === 'POST' && path === '/pro/push/subscribe') return json(await area.pushSubscribe(me.userId, await readJson(req)))
     if (method === 'PUT' && path === '/pro/push/prefs') return json(await area.pushPrefs(me.userId, await readJson(req)))
@@ -162,6 +168,9 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (m && method === 'POST' && m[2] === '/welcome') return json(await adm.sendWelcome(admin.userId, m[1], (await readJson(req)).body))
     if (method === 'GET' && path === '/admin/welcome') return json(await adm.welcomeInfo())
     if (method === 'POST' && path === '/admin/welcome-all') return json(await adm.sendWelcomeAll(admin.userId, (await readJson(req)).body))
+    if (method === 'GET' && path === '/admin/feed') return json(await feed.adminFeed())
+    const fa = path.match(/^\/admin\/feed\/(\d{1,15})$/)
+    if (fa && method === 'PUT') { const b = await readJson(req); return json(await feed.adminSetHidden(admin.userId, fa[1], b.hidden === true, b.reason)) }
     if (method === 'GET' && path === '/admin/inbox') return json(await adm.inbox())
     if (method === 'GET' && path === '/admin/announcements') return json(await adm.adminAnnouncements())
     if (method === 'POST' && path === '/admin/announcements') return json(await adm.createAnnouncement(admin.userId, await readJson(req)))
