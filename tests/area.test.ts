@@ -234,7 +234,7 @@ describe('Mural social', () => {
   }
   it('curtir (alterna, sem duplicar), comentar, validar, excluir o próprio, moderação; em análise só vê', async () => {
     const admin = await mkAdmin(), a = await approvedUser(admin, 'Ana Souza'), b = await approvedUser(admin, 'Bruno Dias'), pend = await mkUser()
-    await a.call('POST', '/pro/feed', { body: 'Dica: sempre teste a vedação antes de fechar o forro.' })
+    await a.call('POST', '/pro/feed', { topic: 'dica', title: 'Título do post', body: 'Dica: sempre teste a vedação antes de fechar o forro.' })
     const id = (await b.call('GET', '/pro/feed')).body.items[0].id
     expect((await b.call('PUT', `/pro/feed/${id}/like`, { liked: true })).body).toEqual({ likes: 1, liked: true })
     expect((await b.call('PUT', `/pro/feed/${id}/like`, { liked: true })).body).toEqual({ likes: 1, liked: true }) // idempotente
@@ -247,7 +247,7 @@ describe('Mural social', () => {
     expect((await b.call('POST', `/pro/feed/${id}/comments`, { body: 'me liga 11 98888-7777' })).body.error.code).toBe('post_contact_info')
     const c = await b.call('POST', `/pro/feed/${id}/comments`, { body: 'Verdade! Também uso o teste de pressão.' })
     expect(c.body.items[0]).toMatchObject({ name: 'Bruno Dias', professions: ['Pintores'], mine: true })
-    expect(Object.keys(c.body.items[0]).sort()).toEqual(['at', 'body', 'id', 'mine', 'name', 'professions'])
+    expect(Object.keys(c.body.items[0]).sort()).toEqual(['at', 'body', 'id', 'mine', 'name', 'professions', 'staff'])
     const seen = (await pend.call('GET', `/pro/feed/${id}/comments`)).body.items // quem está em análise lê os comentários
     expect(seen).toHaveLength(1); expect(seen[0].mine).toBe(false)
     expect((await a.call('DELETE', `/pro/feed/comments/${seen[0].id}`)).status).toBe(404) // não apaga comentário alheio
@@ -271,22 +271,22 @@ describe('Mural', () => {
     const admin = await mkAdmin(), a = await approvedUser(admin, 'Ana Souza'), b = await approvedUser(admin, 'Bruno Dias'), pend = await mkUser()
     expect((await api('GET', '/pro/feed')).status).toBe(401)
     expect((await pend.call('GET', '/pro/feed')).body).toMatchObject({ allowed: true, canInteract: false, canPost: false, items: [] })
-    expect((await pend.call('POST', '/pro/feed', { body: 'oi pessoal' })).status).toBe(403)
-    expect((await a.call('POST', '/pro/feed', { body: 'oi' })).body.error.code).toBe('invalid_post')
-    expect((await a.call('POST', '/pro/feed', { body: 'x'.repeat(601) })).body.error.code).toBe('post_too_long')
-    for (const t of ['me chama no 11 99999-8888 pra orçamento', 'veja www.meusite.com', 'https://x.io/abc', 'meu site é pintura.com.br']) expect((await a.call('POST', '/pro/feed', { body: t })).body.error.code, t).toBe('post_contact_info')
-    expect((await a.call('POST', '/pro/feed', { body: 'Alguém indica um bom fornecedor de tinta na Zona Sul?' })).status).toBe(200)
+    expect((await pend.call('POST', '/pro/feed', { topic: 'dica', title: 'Título do post', body: 'oi pessoal' })).status).toBe(403)
+    expect((await a.call('POST', '/pro/feed', { topic: 'dica', title: 'Título do post', body: 'oi' })).body.error.code).toBe('invalid_post')
+    expect((await a.call('POST', '/pro/feed', { topic: 'dica', title: 'Título do post', body: 'x'.repeat(601) })).body.error.code).toBe('post_too_long')
+    for (const t of ['me chama no 11 99999-8888 pra orçamento', 'veja www.meusite.com', 'https://x.io/abc', 'meu site é pintura.com.br']) expect((await a.call('POST', '/pro/feed', { topic: 'dica', title: 'Título do post', body: t })).body.error.code, t).toBe('post_contact_info')
+    expect((await a.call('POST', '/pro/feed', { topic: 'dica', title: 'Título do post', body: 'Alguém indica um bom fornecedor de tinta na Zona Sul?' })).status).toBe(200)
     const seen = (await b.call('GET', '/pro/feed')).body
     expect(seen.items).toHaveLength(1)
     expect(seen.items[0]).toMatchObject({ name: 'Ana Souza', professions: ['Pintores'], body: 'Alguém indica um bom fornecedor de tinta na Zona Sul?', mine: false })
-    expect(Object.keys(seen.items[0]).sort()).toEqual(['at', 'body', 'comments', 'id', 'liked', 'likes', 'mine', 'name', 'professions'])
+    expect(Object.keys(seen.items[0]).sort()).toEqual(['at', 'body', 'comments', 'id', 'liked', 'likes', 'mine', 'name', 'professions', 'staff', 'title', 'topic'])
     expect((await pend.call('GET', '/pro/feed')).body.items).toHaveLength(1) // quem está em análise também VÊ o mural
     expect(JSON.stringify(seen)).not.toMatch(new RegExp(`${a.id}|\\+55|11 9`)) // nenhum id de usuário nem celular
     expect((await b.call('GET', `/pro/me`)).body.fullName).toBe('Bruno Dias') // não existe rota para ler perfil alheio
   })
   it('denunciar, ocultar (admin), excluir a própria; autor suspenso some do mural; sem nome não publica', async () => {
     const admin = await mkAdmin(), a = await approvedUser(admin, 'Ana Souza'), b = await approvedUser(admin, 'Bruno Dias')
-    await a.call('POST', '/pro/feed', { body: 'Primeira postagem de teste' })
+    await a.call('POST', '/pro/feed', { topic: 'dica', title: 'Título do post', body: 'Primeira postagem de teste' })
     const id = (await b.call('GET', '/pro/feed')).body.items[0].id
     expect((await a.call('POST', `/pro/feed/${id}/report`)).body.error.code).toBe('own_post')
     expect((await b.call('POST', `/pro/feed/${id}/report`)).status).toBe(200)
@@ -303,8 +303,8 @@ describe('Mural', () => {
     const noName = await mkUser(); await submitted(noName)
     await api('POST', `/admin/professionals/${noName.id}/decision`, { cookie: admin.cookie, body: { action: 'approve' } })
     expect((await noName.call('GET', '/pro/feed')).body).toMatchObject({ allowed: true, canPost: false, needsName: true })
-    expect((await noName.call('POST', '/pro/feed', { body: 'sem nome ainda' })).body.error.code).toBe('name_required')
-    const own = (await b.call('POST', '/pro/feed', { body: 'Minha postagem para apagar' })).body.items[0].id
+    expect((await noName.call('POST', '/pro/feed', { topic: 'dica', title: 'Título do post', body: 'sem nome ainda' })).body.error.code).toBe('name_required')
+    const own = (await b.call('POST', '/pro/feed', { topic: 'dica', title: 'Título do post', body: 'Minha postagem para apagar' })).body.items[0].id
     expect((await b.call('DELETE', `/pro/feed/${own}`)).status).toBe(200)
   })
 })
@@ -327,5 +327,47 @@ describe('Interesse no Destaque', () => {
     expect(adm).toMatchObject({ total: 1, totalProfessionals: 2 }); expect(adm.byBudget.acima_200).toBe(1); expect(adm.items[0].id).toBe(a.id)
     expect((await a.call('DELETE', '/pro/boost')).body.interest).toBeNull()
     expect((await api('GET', '/admin/boost', { cookie: admin.cookie })).body.total).toBe(0)
+  })
+})
+
+describe('Mural: posts com tema e título; equipe sem limites', () => {
+  async function approvedUser(admin: Awaited<ReturnType<typeof mkUser>>, name: string) {
+    const u = await mkUser(); await u.call('PUT', '/pro/me', { fullName: name }); await submitted(u)
+    await api('POST', `/admin/professionals/${u.id}/decision`, { cookie: admin.cookie, body: { action: 'approve' } }); return u
+  }
+  it('tema e título obrigatórios; post isolado; filtro por tema', async () => {
+    const admin = await mkAdmin(), a = await approvedUser(admin, 'Ana Souza'), b = await approvedUser(admin, 'Bruno Dias')
+    const base = { topic: 'duvida', title: 'Qual tinta usar em parede com mofo?', body: 'Estou com uma parede com mofo no banheiro. Alguém já resolveu?' }
+    expect((await a.call('POST', '/pro/feed', { ...base, topic: 'xyz' })).body.error.code).toBe('invalid_topic')
+    expect((await a.call('POST', '/pro/feed', { ...base, title: 'ab' })).body.error.code).toBe('invalid_title')
+    expect((await a.call('POST', '/pro/feed', { ...base, title: 'x'.repeat(81) })).body.error.code).toBe('title_too_long')
+    expect((await a.call('POST', '/pro/feed', { ...base, title: 'Me liga 11 98888-7777' })).body.error.code).toBe('post_contact_info')
+    const created = (await a.call('POST', '/pro/feed', base)).body
+    await a.call('POST', '/pro/feed', { topic: 'servico', title: 'Reforma de banheiro concluída', body: 'Finalizamos hoje a reforma completa.' })
+    const list = (await b.call('GET', '/pro/feed')).body
+    expect(list.topics.map((t: any) => t.id)).toEqual(['duvida', 'servico', 'dica', 'novidade', 'indicacao', 'outro'])
+    expect(list.items[0]).toMatchObject({ title: 'Reforma de banheiro concluída', topic: 'servico' })
+    expect((await b.call('GET', '/pro/feed?topic=duvida')).body.items.map((i: any) => i.title)).toEqual(['Qual tinta usar em parede com mofo?'])
+    const one = (await b.call('GET', `/pro/feed/${created.createdId}`)).body
+    expect(one.post).toMatchObject({ title: base.title, topic: 'duvida', name: 'Ana Souza', staff: false })
+    expect((await b.call('GET', '/pro/feed/999999')).status).toBe(404)
+  })
+  it('equipe (admin): interage sem aprovação e sem limites, aparece identificada, texto maior, sem filtro de contato', async () => {
+    const admin = await mkAdmin(), a = await approvedUser(admin, 'Ana Souza')
+    expect((await api('GET', '/pro/feed', { cookie: admin.cookie })).body).toMatchObject({ canInteract: true, canPost: true, isStaff: true, maxPost: 3000, myName: 'Equipe Mapa do Mapa' })
+    const long = 'Comunicado importante. '.repeat(60) + ' Fale com a gente: https://mapadomapa.netlify.app ou (11) 99191-2707.'
+    for (let i = 0; i < 12; i++) expect((await api('POST', '/pro/feed', { cookie: admin.cookie, body: { topic: 'novidade', title: `Aviso ${i}`, body: 'Texto do aviso da equipe.' } })).status).toBe(200) // acima do limite de 10/dia dos demais
+    const p = await api('POST', '/pro/feed', { cookie: admin.cookie, body: { topic: 'novidade', title: 'Novidades da plataforma', body: long } })
+    expect(p.status).toBe(200)
+    const seen = (await a.call('GET', '/pro/feed')).body.items
+    expect(seen[0]).toMatchObject({ staff: true, name: 'Equipe Mapa do Mapa', mine: false })
+    const big = seen.find((i: any) => i.title === 'Novidades da plataforma')
+    expect(big.body.length).toBeGreaterThan(1000)
+    expect((await a.call('POST', '/pro/feed', { topic: 'dica', title: 'Tem acima do limite', body: 'x'.repeat(601) })).body.error.code).toBe('post_too_long') // profissionais seguem com 600
+    expect((await api('PUT', `/pro/feed/${big.id}/like`, { cookie: admin.cookie, body: { liked: true } })).body.likes).toBe(1)
+    const c = await api('POST', `/pro/feed/${big.id}/comments`, { cookie: admin.cookie, body: { body: 'Dúvidas? Chame no WhatsApp (11) 99191-2707.' } })
+    expect(c.status).toBe(200); expect(c.body.items[0]).toMatchObject({ staff: true, name: 'Equipe Mapa do Mapa' })
+    expect((await a.call('POST', `/pro/feed/${big.id}/comments`, { body: 'me chama (11) 98888-7777' })).body.error.code).toBe('post_contact_info')
+    expect((await a.call('GET', `/pro/feed/${big.id}/comments`)).body.items[0].staff).toBe(true)
   })
 })
