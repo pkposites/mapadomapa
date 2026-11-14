@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import Button from './Button'
 import { SITE } from '../config/site'
 
@@ -45,6 +46,7 @@ export default function StickyCta() {
       <Button to={SITE.signupPath} arrow fullWidth>
         {SITE.ctaLabel}
       </Button>
+      <Link to="/entrar" className="flex min-h-11 items-center justify-center text-[15px] font-semibold text-white underline decoration-lime decoration-2 underline-offset-4">Já tenho cadastro — Entrar</Link>
     </div>
   )
 }

@@ -22,9 +22,17 @@ export default function Hero() {
             prepare-se para receber oportunidades de serviços na sua região.
           </p>
 
-          <div className="mt-8 flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-8">
+          <p className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-lime/15 px-4 py-2.5 text-[15px] font-semibold text-lime">
+            Pré-cadastro 100% gratuito para profissionais
+          </p>
+
+          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
             <Button id="hero-cta" to={SITE.signupPath} arrow fullWidth className="sm:w-auto">
               {SITE.ctaLabel}
+            </Button>
+
+            <Button to="/entrar" variant="outline" fullWidth className="sm:w-auto">
+              Já tenho cadastro — Entrar
             </Button>
 
             <div className="flex items-center gap-3">

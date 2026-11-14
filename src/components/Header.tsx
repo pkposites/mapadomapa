@@ -25,11 +25,13 @@ export default function Header({ variant = 'landing' }: { variant?: 'landing' | 
               <a href="#abertura" className={navLink}>Abertura</a>
               {!user && <Link to="/entrar" className={navLink}>Entrar</Link>}
             </nav>
-            {user ? (
-              <Button to="/area" size="sm">Minha conta</Button>
-            ) : (
-              <Button to={SITE.signupPath} size="sm">Cadastrar</Button>
-            )}
+            <div className="flex items-center gap-3">
+              {user ? (
+                <Button to="/area" size="sm">Minha área</Button>
+              ) : (
+                <Button to={SITE.signupPath} size="sm">Cadastrar</Button>
+              )}
+            </div>
           </div>
         ) : (
           <Link

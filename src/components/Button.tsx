@@ -6,7 +6,7 @@ type Props = {
   to?: string
   href?: string
   id?: string
-  variant?: 'primary' | 'dark'
+  variant?: 'primary' | 'dark' | 'outline'
   size?: 'md' | 'sm'
   arrow?: boolean
   fullWidth?: boolean
@@ -23,6 +23,7 @@ const variants = {
   primary:
     'bg-lime text-graphite hover:bg-[#cbf88f] focus-visible:outline-lime',
   dark: 'bg-graphite text-white hover:bg-[#2a302b] focus-visible:outline-graphite',
+  outline: 'border border-white/30 bg-transparent text-white hover:bg-white/10 focus-visible:outline-white',
 }
 
 const sizes = {
