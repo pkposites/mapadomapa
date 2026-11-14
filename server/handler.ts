@@ -7,7 +7,8 @@ import {
   SESSION_COOKIE, sessionCookie,
 } from './lib/http'
 import { parseBrazilMobile } from './lib/phone'
-import { loadSession, requireAdmin, revokeSession } from './lib/sessions'
+import { loadSession, requireAdmin, requireUser, revokeSession } from './lib/sessions'
+import * as pro from './pro/service'
 import * as auth from './services/auth'
 
 export type ApiContext = { ip?: string }
@@ -96,6 +97,18 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
       return json({ error: { code: 'unauthenticated', message: 'Entre na sua conta para continuar.' } }, 401, token ? { 'set-cookie': clearSessionCookie(secureCookie(req)) } : {})
     }
     return json(auth.meBody(user))
+  }
+
+  // ---------- Cadastro profissional (Etapa 3): exige login ----------
+  if (path.startsWith('/pro/')) {
+    const me = requireUser(await loadSession(token))
+    if (method === 'GET' && path === '/pro/catalog') return json(await pro.getCatalog())
+    if (method === 'GET' && path === '/pro/profile') return json(await pro.getState(me.userId))
+    if (method === 'PUT' && path === '/pro/professions') return json(await pro.setProfessions(me.userId, await readJson(req)))
+    if (method === 'PUT' && path === '/pro/regions') return json(await pro.setRegions(me.userId, await readJson(req)))
+    if (method === 'PUT' && path === '/pro/work') return json(await pro.setWork(me.userId, await readJson(req)))
+    if (method === 'PUT' && path === '/pro/answers') return json(await pro.saveAnswers(me.userId, await readJson(req)))
+    if (method === 'POST' && path === '/pro/submit') return json(await pro.submit(me.userId, ctx.ip))
   }
 
   // ---------- Administração (apenas a base: guarda de permissão; painel vem depois) ----------

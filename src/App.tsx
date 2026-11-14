@@ -5,6 +5,7 @@ import Entrar from './pages/Entrar'
 import RecuperarSenha from './pages/RecuperarSenha'
 import Conta from './pages/Conta'
 import Admin from './pages/Admin'
+import Profissional from './pages/Profissional'
 import DevSmsPanel from './components/DevSmsPanel'
 import ConsentBanner from './components/ConsentBanner'
 import MetaRouteTracker from './components/MetaRouteTracker'
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/entrar" element={<Entrar />} />
         <Route path="/recuperar-senha" element={<RecuperarSenha />} />
         <Route path="/conta" element={<RequireAuth><Conta /></RequireAuth>} />
+        <Route path="/profissional" element={<RequireAuth><Profissional /></RequireAuth>} />
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
