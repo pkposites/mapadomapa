@@ -1,10 +1,11 @@
 import { CalendarDays } from 'lucide-react'
 import Button from './Button'
 import Reveal from './Reveal'
-import { SITE, daysUntilLaunch } from '../config/site'
+import { SITE } from '../config/site'
+import { useLaunchState } from '../hooks/useLaunchState'
 
 export default function LaunchCta() {
-  const days = daysUntilLaunch()
+  const launch = useLaunchState()
 
   return (
     <section id="abertura" className="bg-graphite py-20 text-white md:py-28">
@@ -16,15 +17,26 @@ export default function LaunchCta() {
                 <CalendarDays size={18} strokeWidth={2} aria-hidden="true" />
                 Abertura prevista
               </p>
-              <p className="mt-4 text-[56px] font-bold leading-none tracking-[-0.04em] md:text-[80px] lg:text-[88px]">
+              <p className="mt-4 text-[length:min(56px,calc((100vw-96px)/5.4))] font-bold leading-none tracking-[-0.04em] md:text-[80px] lg:text-[88px]">
                 {SITE.launchLabel}
               </p>
-              {days > 0 && (
-                <p className="mt-3 text-[18px] text-on-dark">
-                  Faltam <strong className="font-semibold text-white">{days} {days === 1 ? 'dia' : 'dias'}</strong>{' '}
-                  para a abertura.
-                </p>
-              )}
+              <p className="mt-3 text-[18px] text-on-dark" data-testid="countdown">
+                {launch.status === 'upcoming' && (
+                  <>
+                    Faltam{' '}
+                    <strong className="font-semibold text-white">
+                      {launch.days} {launch.days === 1 ? 'dia' : 'dias'}
+                    </strong>{' '}
+                    para a abertura.
+                  </>
+                )}
+                {launch.status === 'today' && (
+                  <strong className="font-semibold text-white">A abertura é hoje!</strong>
+                )}
+                {launch.status === 'open' && (
+                  <strong className="font-semibold text-white">A plataforma já abriu!</strong>
+                )}
+              </p>
               <p className="mt-6 max-w-md text-[17px] leading-relaxed text-on-dark md:text-lg">
                 Cadastre-se agora e saia na frente quando a plataforma abrir em{' '}
                 {SITE.city}.

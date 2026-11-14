@@ -1,33 +1,26 @@
-type Props = {
-  tone?: 'light' | 'dark'
-  className?: string
-}
+import mark from '../assets/logo/mark-reversed.png'
+import wordmark from '../assets/logo/wordmark-reversed.png'
 
-/** Marca: pin grafite sobre quadrado verde-lima + wordmark. */
-export default function Logo({ tone = 'light', className = '' }: Props) {
+/**
+ * Logotipo oficial (versão para fundos escuros), derivado de brand/logo-atual.webp.
+ * Emblema + wordmark lado a lado: o lockup empilhado original ficaria ilegível
+ * numa barra de 64px. Em telas muito estreitas (<360px) só o emblema aparece.
+ */
+export default function Logo({ className = '' }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-2.5 ${className}`}>
-      <svg
-        width="32"
-        height="32"
-        viewBox="0 0 64 64"
-        aria-hidden="true"
-        className="shrink-0"
-      >
-        <rect width="64" height="64" rx="16" fill="#B9F46D" />
-        <path
-          fill="#141715"
-          d="M32 52S16 39.5 16 27a16 16 0 0 1 32 0c0 12.5-16 25-16 25z"
-        />
-        <circle cx="32" cy="27" r="6" fill="#B9F46D" />
-      </svg>
-      <span
-        className={`text-[18px] font-bold tracking-tight ${
-          tone === 'light' ? 'text-white' : 'text-graphite'
-        }`}
-      >
-        Mapa do Mapa
-      </span>
+    <span
+      role="img"
+      aria-label="Mapa do Mapa"
+      className={`inline-flex items-center gap-2.5 ${className}`}
+    >
+      <img src={mark} alt="" width={37} height={36} className="h-9 w-auto shrink-0" />
+      <img
+        src={wordmark}
+        alt=""
+        width={168}
+        height={24}
+        className="h-6 w-auto max-[359px]:hidden"
+      />
     </span>
   )
 }

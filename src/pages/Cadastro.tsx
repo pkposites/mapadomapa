@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react'
 import Header from '../components/Header'
 import Button from '../components/Button'
+import Footer from '../components/Footer'
 import { SITE } from '../config/site'
 
 const ITEMS = [
@@ -53,6 +54,7 @@ export default function Cadastro() {
           </div>
         </div>
       </main>
+      <Footer />
     </>
   )
 }

@@ -40,7 +40,7 @@ export default function Hero() {
         </div>
 
         {/* No mobile o aparelho é cortado na base, como um app saindo da tela. */}
-        <div className="mt-4 h-[476px] overflow-hidden pt-9 lg:mt-0 lg:h-auto lg:overflow-visible lg:pt-0">
+        <div className="mt-4 h-[476px] min-w-0 overflow-hidden pt-9 lg:mt-0 lg:h-auto lg:overflow-visible lg:pt-0">
           <AppMockup />
         </div>
       </div>

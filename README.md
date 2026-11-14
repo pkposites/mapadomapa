@@ -12,7 +12,7 @@ npm install
 npm run dev        # desenvolvimento
 npm run build      # typecheck + build de produção (gera o service worker)
 npm run preview    # serve o build local
-npm run icons      # regenera os ícones PWA em public/
+npm run brand      # regenera logo (reverso) e ícones PWA a partir de brand/logo-atual.webp
 ```
 
 ## Onde editar

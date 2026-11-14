@@ -9,7 +9,7 @@ export default function AppMockup() {
     <div
       role="img"
       aria-label="Exemplo da tela do app com um pedido de orçamento de pintura em Vila Mariana"
-      className="relative mx-auto w-[300px] md:w-[320px]"
+      className="relative mx-auto w-full max-w-[300px] md:max-w-[320px]"
     >
       {/* Notificação flutuante */}
       <div className="pop-in absolute -left-3 -top-7 z-10 flex w-[236px] items-center gap-3 rounded-2xl bg-white p-3 pr-4 shadow-[0_12px_32px_-8px_rgba(0,0,0,0.45)] lg:-left-16">

@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Landing from './pages/Landing'
 import Cadastro from './pages/Cadastro'
+import Privacidade from './pages/Privacidade'
+import Termos from './pages/Termos'
 import { SITE } from './config/site'
 
 /** Volta ao topo ao trocar de página; respeita âncoras (#categorias). */
@@ -21,6 +23,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path={SITE.signupPath} element={<Cadastro />} />
+        <Route path={SITE.privacyPath} element={<Privacidade />} />
+        <Route path={SITE.termsPath} element={<Termos />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
