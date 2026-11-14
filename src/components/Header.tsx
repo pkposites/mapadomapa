@@ -26,7 +26,7 @@ export default function Header({ variant = 'landing' }: { variant?: 'landing' | 
               {!user && <Link to="/entrar" className={navLink}>Entrar</Link>}
             </nav>
             {user ? (
-              <Button to="/conta" size="sm">Minha conta</Button>
+              <Button to="/area" size="sm">Minha conta</Button>
             ) : (
               <Button to={SITE.signupPath} size="sm">Cadastrar</Button>
             )}

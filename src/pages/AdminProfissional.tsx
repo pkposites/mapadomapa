@@ -9,6 +9,8 @@ import SubmitButton from '../components/ui/SubmitButton'
 import AdminGate from '../admin/AdminGate'
 import StatusBadge from '../admin/StatusBadge'
 import type { Detail, Status } from '../admin/types'
+import { Thread } from './area/Mensagens'
+import type { Msg } from '../area/types'
 import { api, ApiError } from '../lib/api'
 
 type Action = 'approve' | 'request_changes' | 'reject' | 'suspend' | 'reinstate'
@@ -59,10 +61,34 @@ function Page() {
   return (
     <Shell>
       <Link to="/admin" className="inline-flex min-h-11 items-center gap-2 text-[15px] font-semibold"><ArrowLeft size={20} aria-hidden="true" /> Voltar à lista</Link>
-      <div className="mt-2 flex flex-wrap items-center gap-3"><h1 className="text-[28px] font-bold tracking-[-0.02em]">{d.phone}</h1><StatusBadge status={d.reviewStatus} /></div>
+      <div className="mt-2 flex flex-wrap items-center gap-3"><h1 className="text-[28px] font-bold tracking-[-0.02em]">{d.fullName ?? d.phone}</h1><StatusBadge status={d.reviewStatus} /></div>
       {msg && <div className="mt-3"><Alert tone="success">{msg}</Alert></div>}
       {err && <div className="mt-3"><Alert tone="error">{err}</Alert></div>}
       {d.reviewNotes && <p className="mt-3 rounded-2xl bg-white p-4 text-[15px]"><strong>Última observação:</strong> {d.reviewNotes}</p>}
+
+      <Block title="Perfil">
+        <div className="flex items-start gap-4">
+          <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-full bg-ice text-muted">
+            {d.hasPhoto ? <img src={`/api/admin/professionals/${d.id}/photo`} alt="Foto do profissional" className="size-full object-cover" /> : '—'}
+          </div>
+          <div className="min-w-0 text-[15px] leading-snug">
+            <p><strong>Nome:</strong> {d.fullName ?? 'não informado'}</p>
+            <p className="mt-1"><strong>Apresentação:</strong> {d.bio ?? '—'}</p>
+            <p className="mt-1"><strong>Serviços:</strong> {d.services ?? '—'}</p>
+            <p className="mt-1"><strong>Outras informações:</strong> {d.extraInfo ?? '—'}</p>
+          </div>
+        </div>
+        {d.profileEvents.length > 0 && (
+          <div className="mt-4 rounded-2xl bg-ice p-3"><p className="text-[14px] font-semibold">Alterações feitas pelo profissional</p>
+            <ul className="mt-1 space-y-1 text-[14px]">{d.profileEvents.map((e, i) => <li key={i}>{fmt(e.at)} · {e.details ?? e.kind}</li>)}</ul></div>
+        )}
+      </Block>
+
+      <Block title={`Mensagens${d.unreadMessages ? ` (${d.unreadMessages} não lida(s))` : ''}`}>
+        <Thread mine="admin"
+          load={() => api.get<{ messages: Msg[] }>(`/admin/professionals/${d.id}/messages`).then((r) => r.messages)}
+          send={(body) => api.post<{ messages: Msg[] }>(`/admin/professionals/${d.id}/messages`, { body }).then((r) => r.messages)} />
+      </Block>
 
       <Block title="Celular">
         <p className="flex items-center gap-2 text-[16px]">{d.phoneVerified ? <><BadgeCheck size={20} aria-hidden="true" /> Verificado pela equipe</> : <><ShieldAlert size={20} aria-hidden="true" /> Ainda não verificado</>}</p>

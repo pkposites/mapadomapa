@@ -152,7 +152,7 @@ export default function Profissional() {
       <h2 className="mt-4 text-[24px] font-bold tracking-tight">Cadastro enviado!</h2>
       <p className="mt-2 text-[16px] leading-relaxed text-muted">{state.approvalNote}</p>
       <p className="mt-2 text-[14px] text-muted">Status: <strong className="text-graphite">em análise</strong>. Você não precisa fazer mais nada agora.</p>
-      <div className="mt-6"><Button to="/conta" variant="dark" fullWidth>Voltar para minha conta</Button></div>
+      <div className="mt-6"><Button to="/area" variant="dark" fullWidth>Ir para minha área</Button></div>
     </div>
   ) : (
     <>
@@ -192,7 +192,7 @@ export default function Profissional() {
             {step <= 3 ? <SubmitButton type="button" loading={busy} disabled={!canNext} onClick={next}>Continuar</SubmitButton>
               : <SubmitButton type="button" loading={busy} onClick={submit}>Enviar para análise</SubmitButton>}
           </div>
-          <p className="mx-auto mt-2 max-w-lg text-center"><button type="button" className="py-3 text-[14px] font-medium text-muted underline underline-offset-4" onClick={() => navigate('/conta')}>Salvar e continuar depois</button></p>
+          <p className="mx-auto mt-2 max-w-lg text-center"><button type="button" className="py-3 text-[14px] font-medium text-muted underline underline-offset-4" onClick={() => navigate('/area')}>Salvar e continuar depois</button></p>
         </div>
       )}
     </Shell>

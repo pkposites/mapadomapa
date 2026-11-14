@@ -12,8 +12,14 @@ import {
 import { parseBrazilMobile } from './lib/phone'
 import { loadSession, requireAdmin, requireUser, revokeSession } from './lib/sessions'
 import * as pro from './pro/service'
+import * as area from './pro/area'
 import * as adm from './admin/service'
 import * as auth from './services/auth'
+
+function photoResponse(p: { type: string; data: Buffer } | null): Response {
+  if (!p) return json({ error: { code: 'not_found', message: 'Sem foto.' } }, 404)
+  return new Response(new Uint8Array(p.data), { status: 200, headers: { 'content-type': p.type, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } })
+}
 
 export type ApiContext = { ip?: string }
 
@@ -123,15 +129,37 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (method === 'PUT' && path === '/pro/work') return json(await pro.setWork(me.userId, await readJson(req)))
     if (method === 'PUT' && path === '/pro/answers') return json(await pro.saveAnswers(me.userId, await readJson(req)))
     if (method === 'POST' && path === '/pro/submit') return json(await pro.submit(me.userId, ctx.ip))
+    // Área do profissional (Etapa 5)
+    if (method === 'GET' && path === '/pro/home') return json(await area.home(me.userId))
+    if (method === 'GET' && path === '/pro/me') return json(await area.getMe(me.userId))
+    if (method === 'PUT' && path === '/pro/me') return json(await area.updateMe(me.userId, await readJson(req)))
+    if (method === 'PUT' && path === '/pro/me/work') return json(await area.updateWork(me.userId, await readJson(req)))
+    if (method === 'PUT' && path === '/pro/me/regions') return json(await area.changeRegions(me.userId, await readJson(req)))
+    if (method === 'PUT' && path === '/pro/photo') return json(await area.setPhoto(me.userId, await readJson(req)))
+    if (method === 'DELETE' && path === '/pro/photo') return json(await area.removePhoto(me.userId))
+    if (method === 'GET' && path === '/pro/photo') return photoResponse(await area.getPhoto(me.userId))
+    if (method === 'GET' && path === '/pro/messages') return json(await area.thread(me.userId, 'professional'))
+    if (method === 'GET' && path === '/pro/messages/unread') return json({ unread: await area.unreadCount(me.userId) })
+    if (method === 'POST' && path === '/pro/messages') { const b = await readJson(req); return json(await area.postMessage(me.userId, 'professional', me.userId, b.body, b.kind === 'change_request' ? 'change_request' : 'message')) }
+    if (method === 'GET' && path === '/pro/announcements') return json(await area.listAnnouncements(me.userId))
+    if (method === 'POST' && path === '/pro/announcements/read') return json(await area.markAnnouncementsRead(me.userId))
   }
 
   // ---------- Administração (apenas a base: guarda de permissão; painel vem depois) ----------
   if (path.startsWith('/admin/') && path !== '/admin/ping') {
     const admin = requireAdmin(await loadSession(token))
-    const m = path.match(/^\/admin\/professionals\/([0-9a-f-]{36})(\/decision|\/phone)?$/)
+    const m = path.match(/^\/admin\/professionals\/([0-9a-f-]{36})(\/decision|\/phone|\/messages|\/photo)?$/)
     if (method === 'GET' && path === '/admin/stats') return json(await adm.stats())
     if (method === 'GET' && path === '/admin/professionals') return json(await adm.list({ status: url.searchParams.get('status'), q: url.searchParams.get('q'), page: url.searchParams.get('page') }))
     if (m && method === 'GET' && !m[2]) return json(await adm.detail(admin.userId, m[1], ctx.ip))
+    if (m && method === 'GET' && m[2] === '/messages') return json(await adm.threadFor(m[1]))
+    if (m && method === 'POST' && m[2] === '/messages') return json(await adm.sendMessage(admin.userId, m[1], (await readJson(req)).body))
+    if (m && method === 'GET' && m[2] === '/photo') return photoResponse(await area.getPhoto(m[1]))
+    if (method === 'GET' && path === '/admin/inbox') return json(await adm.inbox())
+    if (method === 'GET' && path === '/admin/announcements') return json(await adm.adminAnnouncements())
+    if (method === 'POST' && path === '/admin/announcements') return json(await adm.createAnnouncement(admin.userId, await readJson(req)))
+    const an = path.match(/^\/admin\/announcements\/(\d{1,12})$/)
+    if (an && method === 'PUT') return json(await adm.setAnnouncementPublished(admin.userId, an[1], (await readJson(req)).published === true))
     if (m && method === 'POST' && m[2] === '/decision') return json(await adm.decide(admin.userId, m[1], await readJson(req), ctx.ip))
     if (m && method === 'POST' && m[2] === '/phone') return json(await adm.setPhoneVerified(admin.userId, m[1], (await readJson(req)).verified === true, ctx.ip))
   }

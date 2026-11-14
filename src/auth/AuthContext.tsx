@@ -18,7 +18,7 @@ const hint = {
   get: (): boolean => { try { return localStorage.getItem(HINT) === '1' } catch { return false } },
   set: (on: boolean): void => { try { on ? localStorage.setItem(HINT, '1') : localStorage.removeItem(HINT) } catch { /* sem storage */ } },
 }
-const PRIVATE_PATHS = ['/conta', '/admin']
+const isPrivate = (p: string) => p === '/conta' || p === '/profissional' || p.startsWith('/area') || p.startsWith('/admin')
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me['user'] | null>(null)
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   useEffect(() => {
     // Páginas privadas sempre perguntam ao servidor; as públicas só se houver indício de sessão.
-    if (hint.get() || PRIVATE_PATHS.includes(pathname)) void refresh()
+    if (hint.get() || isPrivate(pathname)) void refresh()
     else setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

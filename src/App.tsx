@@ -2,8 +2,12 @@ import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Landing from './pages/Landing'
 import Entrar from './pages/Entrar'
-import Conta from './pages/Conta'
+import Inicio from './pages/area/Inicio'
+import Perfil from './pages/area/Perfil'
+import Mensagens from './pages/area/Mensagens'
+import Pedidos from './pages/area/Pedidos'
 import Admin from './pages/Admin'
+import { AdminComunicados, AdminMensagens } from './pages/AdminComunicacao'
 import Profissional from './pages/Profissional'
 import AdminProfissional from './pages/AdminProfissional'
 import DevSmsPanel from './components/DevSmsPanel'
@@ -40,9 +44,15 @@ export default function App() {
         <Route path={SITE.privacyPath} element={<Privacidade />} />
         <Route path={SITE.termsPath} element={<Termos />} />
         <Route path="/entrar" element={<Entrar />} />
-        <Route path="/conta" element={<RequireAuth><Conta /></RequireAuth>} />
+        <Route path="/conta" element={<Navigate to="/area" replace />} />
+        <Route path="/area" element={<RequireAuth><Inicio /></RequireAuth>} />
+        <Route path="/area/perfil" element={<RequireAuth><Perfil /></RequireAuth>} />
+        <Route path="/area/mensagens" element={<RequireAuth><Mensagens /></RequireAuth>} />
+        <Route path="/area/pedidos" element={<RequireAuth><Pedidos /></RequireAuth>} />
         <Route path="/profissional" element={<RequireAuth><Profissional /></RequireAuth>} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/mensagens" element={<AdminMensagens />} />
+        <Route path="/admin/comunicados" element={<AdminComunicados />} />
         <Route path="/admin/profissionais/:id" element={<AdminProfissional />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

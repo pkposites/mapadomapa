@@ -115,7 +115,7 @@ export default function Cadastro() {
       // Mesmo event_name + event_id do servidor => a Meta conta UMA conversão (deduplicação).
       if (consent && r.tracking) trackBrowserEvent(r.tracking.eventName, { content_name: 'pre_cadastro' }, r.tracking.eventId)
       await refresh()
-      navigate('/conta', { replace: true })
+      navigate('/area', { replace: true })
     } catch (err) {
       fail(err, 'code')
     } finally {

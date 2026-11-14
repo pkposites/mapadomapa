@@ -28,7 +28,7 @@ export default function Entrar() {
     try {
       await api.post('/auth/login', { phone, password })
       await refresh()
-      navigate(state.from ?? '/conta', { replace: true })
+      navigate(state.from ?? '/area', { replace: true })
     } catch (err) {
       if (err instanceof ApiError && err.code === 'phone_not_verified') {
         navigate('/cadastro', { state: { verifyPhone: phone, resendIn: err.data.resendIn } })

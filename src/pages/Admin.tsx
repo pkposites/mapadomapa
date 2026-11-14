@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ChevronRight, ShieldAlert, Search } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Megaphone, MessageSquare, ShieldAlert, Search } from 'lucide-react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import Alert from '../components/ui/Alert'
@@ -48,6 +48,11 @@ function Panel() {
           <h1 className="mt-2 text-[30px] font-bold leading-tight tracking-[-0.02em]">Profissionais</h1>
           <p className="mt-1 text-[15px] text-muted">Nenhum profissional aparece ao público sem a sua aprovação.</p>
 
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Link to="/admin/mensagens" className="flex min-h-14 items-center gap-2 rounded-2xl bg-graphite px-4 font-semibold text-white"><MessageSquare size={18} aria-hidden="true" /> Mensagens{stats && stats.unreadMessages > 0 && <span className="ml-auto rounded-full bg-lime px-2 text-[13px] text-graphite">{stats.unreadMessages}</span>}</Link>
+            <Link to="/admin/comunicados" className="flex min-h-14 items-center gap-2 rounded-2xl bg-white px-4 font-semibold"><Megaphone size={18} aria-hidden="true" /> Comunicados</Link>
+          </div>
+
           <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-3" role="group" aria-label="Filtrar por situação">
             {ORDER.map((s) => (
               <button key={s} type="button" aria-pressed={status === s} onClick={() => setStatus(status === s ? '' : s)}
@@ -73,7 +78,8 @@ function Panel() {
                 <Link to={`/admin/profissionais/${i.id}`} className="block rounded-2xl bg-white p-4 transition duration-150 active:scale-[0.99]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[17px] font-semibold">{i.phone}</p>
+                      <p className="text-[17px] font-semibold">{i.name ?? i.phone}{i.unread > 0 && <span className="ml-2 rounded-full bg-danger px-2 py-0.5 text-[12px] text-white">{i.unread} msg</span>}</p>
+                      {i.name && <p className="text-[14px] text-muted">{i.phone}</p>}
                       <p className="mt-0.5 text-[14px] text-muted">{i.professions.join(' · ') || 'Sem profissão escolhida'}</p>
                       <p className="text-[14px] text-muted">{i.regions.join(' · ') || 'Sem região'}</p>
                     </div>

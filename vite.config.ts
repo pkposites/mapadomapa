@@ -32,6 +32,7 @@ export default defineConfig(({ command }) => {
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false, // o registro é feito em src/main.tsx (com verificação periódica de nova versão)
       includeAssets: ['favicon.png', 'apple-touch-icon.png', 'robots.txt'],
       manifest: {
         name: 'Mapa do Mapa',
@@ -39,12 +40,17 @@ export default defineConfig(({ command }) => {
         description:
           'Receba pedidos de orçamento direto no seu celular. Pré-cadastro gratuito em São Paulo.',
         lang: 'pt-BR',
-        start_url: '/',
+        id: '/area',
+        start_url: '/area',
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',
         background_color: '#141715',
         theme_color: '#141715',
+        shortcuts: [
+          { name: 'Mensagens', short_name: 'Mensagens', url: '/area/mensagens', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+          { name: 'Meu Perfil', short_name: 'Perfil', url: '/area/perfil', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+        ],
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -58,6 +64,10 @@ export default defineConfig(({ command }) => {
       },
       workbox: {
         navigateFallback: '/index.html',
+        // Versão nova assume sem reinstalar; nada de /api entra no cache (cadastro e mensagens sempre frescos).
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // A landing é em português: só precisamos dos subconjuntos latinos da fonte.
