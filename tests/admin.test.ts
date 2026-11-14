@@ -82,12 +82,11 @@ describe('Listagem e consulta', () => {
     expect(d).toMatchObject({ reviewStatus: 'pending_review', phoneVerified: false, regions: ['Zona Sul'], professions: [{ name: 'Eletricistas', experienceYears: 7, level: 'Avançado' }] })
     expect(d.work).toMatchObject({ ownTools: 'Kit completo próprio', vehicle: 'Carro', workStructure: 'Trabalho sozinho' })
     const a = d.assessments[0]
-    expect(a.questions).toHaveLength(5)
+    expect(a.questions).toHaveLength(3)
     expect(a.questions[0]).toMatchObject({ kind: 'choice', points: 3, best: 3 })
     expect(a.questions[0].answer).toMatch(/\w/)
-    expect(a.questions[4]).toMatchObject({ kind: 'open' }); expect(a.questions[4].answer).toContain('origem')
     expect(a.scores).toMatchObject({ rule: 100 }); expect(a.scores.technical).toBeGreaterThan(0)
-    expect(d.aiEvaluations[0]).toMatchObject({ provider: 'sim' })
+    expect(d.aiEvaluations).toHaveLength(0)
     expect(JSON.stringify(d)).not.toMatch(/scrypt|password_hash|token_hash/)
     expect((await query('SELECT 1 FROM audit_log WHERE event = $1', ['admin.view_professional'])).length).toBe(1) // quem viu dados pessoais fica registrado
   })

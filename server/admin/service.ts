@@ -4,7 +4,7 @@ import { query, withTransaction } from '../lib/db'
 import { ApiError } from '../lib/http'
 import { formatNational } from '../lib/phone'
 import { OPTIONS } from '../pro/service'
-import { QUESTIONNAIRES } from '../pro/questions'
+import { ALL_QUESTIONS, QUESTIONNAIRES } from '../pro/questions'
 
 type Row = Record<string, any>
 const STATUSES = ['not_submitted', 'pending_review', 'needs_changes', 'approved', 'rejected', 'suspended'] as const
@@ -96,7 +96,10 @@ export async function detail(adminId: string, userId: string, ip?: string) {
         slug: p.slug as string, name: p.name as string,
         scores: t ? { rule: t.rule_score as number, ai: t.ai_score as number | null, technical: t.technical_score as number, flags: t.flags as string[], evaluatedAt: t.evaluated_at } : null,
         // Para o REVISOR os pontos e riscos são mostrados (o profissional nunca os vê).
-        questions: (QUESTIONNAIRES[p.slug] ?? []).map((q) => {
+        questions: (ALL_QUESTIONS[p.slug] ?? [])
+          // v2 mostra as 3 ativas; perguntas antigas (v1) aparecem só se o profissional as respondeu
+          .filter((q) => (QUESTIONNAIRES[p.slug] ?? []).some((x) => x.id === q.id) || mine.some((x) => x.question_id === q.id))
+          .map((q) => {
           const a = mine.find((x) => x.question_id === q.id)
           if (q.kind === 'choice') {
             const o = q.options.find((x) => x.id === a?.choice)

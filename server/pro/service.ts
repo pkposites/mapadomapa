@@ -268,8 +268,9 @@ export async function submit(userId: string, ip?: string) {
   for (const p of s.professions) {
     const idRow = (await query<Row>('SELECT id FROM professions WHERE slug = $1', [p.slug]))[0]
     const answers: AnswerMap = s.answers[p.slug] ?? {}
-    const openQ = (QUESTIONNAIRES[p.slug] ?? []).find((x) => x.kind === 'open')!
-    evals.push({ slug: p.slug, id: idRow.id, rule: ruleScore(p.slug, answers), ai: await evaluateOpenAnswer(p.slug, p.name, answers[openQ.id]?.text ?? '') })
+    const openQ = (QUESTIONNAIRES[p.slug] ?? []).find((x) => x.kind === 'open') // v2 não tem pergunta aberta
+    const ai: AiOutcome = openQ ? await evaluateOpenAnswer(p.slug, p.name, answers[openQ.id]?.text ?? '') : { status: 'off' }
+    evals.push({ slug: p.slug, id: idRow.id, rule: ruleScore(p.slug, answers), ai })
   }
 
   await withTransaction(async (c) => {
