@@ -33,7 +33,7 @@ export default defineConfig(({ command }) => {
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: false, // o registro é feito em src/main.tsx (com verificação periódica de nova versão)
-      includeAssets: ['favicon.png', 'apple-touch-icon.png', 'robots.txt'],
+      includeAssets: ['favicon.ico', 'favicon.png', 'favicon-16.png', 'favicon-32.png', 'apple-touch-icon.png', 'robots.txt'],
       manifest: {
         name: 'Mapa do Mapa',
         short_name: 'Mapa do Mapa',
