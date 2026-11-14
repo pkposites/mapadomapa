@@ -4,6 +4,7 @@ import { ArrowRight, ChevronDown, ClipboardList, MessageSquare, ShieldCheck, Use
 import AreaShell from '../../area/Shell'
 import InstallPrompt from '../../area/InstallPrompt'
 import ShareCard from '../../area/ShareCard'
+import PushCard from '../../area/PushCard'
 import Spinner from '../../components/ui/Spinner'
 import Alert from '../../components/ui/Alert'
 import { api } from '../../lib/api'
@@ -112,6 +113,7 @@ export default function Inicio() {
 
           <ShareCard />
           <InstallPrompt />
+          <PushCard />
         </div>
       )}
     </AreaShell>

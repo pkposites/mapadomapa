@@ -4,6 +4,7 @@ import { query, withTransaction } from '../lib/db'
 import { ApiError } from '../lib/http'
 import { enforce } from '../lib/rateLimit'
 import { getState, setRegions, setWork } from './service'
+import { endpointAllowed, MSG_PAYLOAD, notify, pushConfigured, vapidPublicKey } from '../lib/push'
 
 type Row = Record<string, any>
 const bad = (code: string, message: string) => new ApiError(400, code, message)
@@ -159,6 +160,7 @@ export async function postMessage(userId: string, sender: 'professional' | 'admi
   if (text.length < 1) throw bad('empty_message', 'Escreva a mensagem.')
   await enforce(`msg:${sender}:${senderId}`, sender === 'admin' ? 300 : 20, 3600)
   await query('INSERT INTO messages (user_id, sender, sender_user_id, kind, body) VALUES ($1,$2,$3,$4,$5)', [userId, sender, senderId, kind, text])
+  if (sender === 'admin') await notify('messages', [userId], MSG_PAYLOAD)
   return thread(userId, sender)
 }
 export async function unreadCount(userId: string): Promise<number> {
@@ -177,4 +179,41 @@ export async function markAnnouncementsRead(userId: string) {
   await query(
     `INSERT INTO announcement_reads (user_id, announcement_id) SELECT $1, id FROM announcements WHERE published ON CONFLICT DO NOTHING`, [userId])
   return listAnnouncements(userId)
+}
+
+// ---------- Notificações push (opcionais) ----------
+export async function pushStatus(userId: string) {
+  const rows = await query<Row>('SELECT topic_messages, topic_announcements FROM push_subscriptions WHERE user_id = $1', [userId])
+  return {
+    configured: pushConfigured(), publicKey: vapidPublicKey(), subscribed: rows.length > 0,
+    prefs: { messages: rows.length ? rows.every((r) => r.topic_messages) : true, announcements: rows.length ? rows.every((r) => r.topic_announcements) : true },
+  }
+}
+export async function pushSubscribe(userId: string, body: Record<string, unknown>) {
+  if (!pushConfigured()) throw new ApiError(503, 'push_unavailable', 'Os avisos no celular ainda não estão disponíveis.')
+  await enforce(`push:sub:${userId}`, 20, 3600)
+  const sub = body.subscription as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } } | undefined
+  if (!sub || !endpointAllowed(sub.endpoint) || typeof sub.keys?.p256dh !== 'string' || typeof sub.keys?.auth !== 'string'
+    || sub.keys.p256dh.length > 200 || sub.keys.auth.length > 100 || !/^[A-Za-z0-9_-]+={0,2}$/.test(sub.keys.p256dh) || !/^[A-Za-z0-9_-]+={0,2}$/.test(sub.keys.auth)) {
+    throw bad('invalid_subscription', 'Não foi possível ativar os avisos neste aparelho.')
+  }
+  await withTransaction(async (c) => {
+    // Mesmo aparelho em outra conta: o aviso passa a valer só para quem entrou por último.
+    await c.query(
+      `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, failures = 0`,
+      [userId, sub.endpoint, sub.keys!.p256dh, sub.keys!.auth])
+    await c.query('DELETE FROM push_subscriptions WHERE user_id = $1 AND id NOT IN (SELECT id FROM push_subscriptions WHERE user_id = $1 ORDER BY id DESC LIMIT 5)', [userId]) // no máx. 5 aparelhos
+  })
+  return pushStatus(userId)
+}
+export async function pushPrefs(userId: string, body: Record<string, unknown>) {
+  if (typeof body.messages !== 'boolean' || typeof body.announcements !== 'boolean') throw bad('invalid_prefs', 'Preferências inválidas.')
+  await query('UPDATE push_subscriptions SET topic_messages = $2, topic_announcements = $3 WHERE user_id = $1', [userId, body.messages, body.announcements])
+  return pushStatus(userId)
+}
+export async function pushUnsubscribe(userId: string, body: Record<string, unknown>) {
+  if (typeof body.endpoint === 'string') await query('DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2', [userId, body.endpoint])
+  else await query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId])
+  return pushStatus(userId)
 }

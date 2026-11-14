@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { query } from '../server/lib/db'
 import { QUESTIONNAIRES } from '../server/pro/questions'
 import { api, cleanDb, startDb, stopDb } from './helpers'
+import { setPushSender, type Sub } from '../server/lib/push'
 
 beforeAll(async () => { await startDb() })
 afterAll(async () => { await stopDb() })
@@ -163,5 +164,65 @@ describe('Boas-vindas (administração)', () => {
     expect((await query<any>("SELECT count(*)::int n FROM messages WHERE kind = 'welcome'"))[0].n).toBe(3)
     expect((await c.call('GET', '/pro/messages/unread')).body.unread).toBe(1)
     expect((await query<any>("SELECT 1 FROM messages WHERE kind='welcome' AND user_id = $1", [admin.id])).length).toBe(0) // admin não recebe
+  })
+})
+
+describe('Notificações push', () => {
+  const sent: { sub: Sub; payload: any }[] = []
+  let fail: number | null = null
+  beforeEach(() => {
+    sent.length = 0; fail = null
+    process.env.VAPID_PUBLIC_KEY = 'BPublicKeyDeTeste'; process.env.VAPID_PRIVATE_KEY = 'privada-de-teste'
+    setPushSender(async (sub, payload) => { if (fail) throw Object.assign(new Error('x'), { statusCode: fail }); sent.push({ sub, payload: JSON.parse(payload) }) })
+  })
+  afterEach(() => setPushSender(null))
+  const sub = (n: string) => ({ subscription: { endpoint: `https://fcm.googleapis.com/fcm/send/${n}`, keys: { p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM', auth: 'tBHItJI5svbpez7KI4CCXg' } } })
+
+  it('desligado sem chaves; exige login; valida endpoint (só serviços de push) e chaves', async () => {
+    const u = await mkUser()
+    delete process.env.VAPID_PUBLIC_KEY
+    expect((await u.call('GET', '/pro/push')).body).toMatchObject({ configured: false, publicKey: null })
+    expect((await u.call('POST', '/pro/push/subscribe', sub('a'))).status).toBe(503)
+    process.env.VAPID_PUBLIC_KEY = 'BPublicKeyDeTeste'
+    expect((await api('GET', '/pro/push')).status).toBe(401)
+    for (const endpoint of ['http://fcm.googleapis.com/x', 'https://evil.example.com/x', 'https://fcm.googleapis.com.evil.com/x', 'https://user:pw@fcm.googleapis.com/x', 'ftp://x']) {
+      expect((await u.call('POST', '/pro/push/subscribe', { subscription: { ...sub('a').subscription, endpoint } })).body.error.code, endpoint).toBe('invalid_subscription')
+    }
+    expect((await u.call('POST', '/pro/push/subscribe', { subscription: { ...sub('a').subscription, keys: { p256dh: '<x>', auth: 'y' } } })).body.error.code).toBe('invalid_subscription')
+    const ok = (await u.call('POST', '/pro/push/subscribe', sub('a'))).body
+    expect(ok).toMatchObject({ configured: true, subscribed: true, prefs: { messages: true, announcements: true } })
+    expect(ok.publicKey).toBe('BPublicKeyDeTeste'); expect(JSON.stringify(ok)).not.toContain('privada-de-teste')
+  })
+  it('avisa em mensagem da equipe, decisão e comunicado — com texto genérico, só para quem ativou', async () => {
+    const admin = await mkAdmin(), u = await mkUser(), other = await mkUser()
+    await submitted(u)
+    await u.call('POST', '/pro/push/subscribe', sub('u1')); await other.call('POST', '/pro/push/subscribe', sub('o1'))
+    await api('POST', `/admin/professionals/${u.id}/messages`, { cookie: admin.cookie, body: { body: 'Texto privado que NÃO pode vazar para a tela de bloqueio' } })
+    expect(sent).toHaveLength(1); expect(sent[0].sub.endpoint).toContain('u1'); expect(sent[0].payload).toMatchObject({ url: '/area/mensagens' })
+    expect(JSON.stringify(sent[0].payload)).not.toContain('privado')
+    await api('POST', `/admin/professionals/${u.id}/decision`, { cookie: admin.cookie, body: { action: 'approve' } })
+    expect(sent).toHaveLength(2); expect(sent[1].payload.body).toBe('Há uma atualização sobre o seu cadastro.')
+    await api('POST', '/admin/announcements', { cookie: admin.cookie, body: { title: 'Novidade importante', body: 'Detalhes do comunicado.' } })
+    expect(sent.filter((x) => x.payload.tag === 'comunicado')).toHaveLength(2) // os dois aparelhos ativados
+    await u.call('PUT', '/pro/push/prefs', { messages: false, announcements: true })
+    const n = sent.length
+    await api('POST', `/admin/professionals/${u.id}/messages`, { cookie: admin.cookie, body: { body: 'outra' } })
+    expect(sent).toHaveLength(n) // preferência respeitada
+    await u.call('POST', '/pro/push/unsubscribe', {})
+    expect((await u.call('GET', '/pro/push')).body.subscribed).toBe(false)
+    // mensagem do PROFISSIONAL para a equipe não gera push
+    await other.call('POST', '/pro/messages', { body: 'oi' }); expect(sent).toHaveLength(n)
+  })
+  it('endpoint expirado (410) é removido; falha comum não quebra a ação principal; aparelho trocado de conta', async () => {
+    const admin = await mkAdmin(), a = await mkUser(), b = await mkUser()
+    await a.call('POST', '/pro/push/subscribe', sub('x1'))
+    fail = 410
+    const r = await api('POST', `/admin/professionals/${a.id}/messages`, { cookie: admin.cookie, body: { body: 'oi' } })
+    expect(r.status).toBe(200) // a mensagem foi enviada mesmo com a falha do push
+    expect((await query<any>('SELECT 1 FROM push_subscriptions')).length).toBe(0)
+    fail = null
+    await a.call('POST', '/pro/push/subscribe', sub('shared')); await b.call('POST', '/pro/push/subscribe', sub('shared'))
+    expect((await query<any>('SELECT user_id FROM push_subscriptions')).map((x) => x.user_id)).toEqual([b.id])
+    expect((await a.call('GET', '/pro/push')).body.subscribed).toBe(false)
   })
 })

@@ -7,6 +7,7 @@ import { formatNational } from '../lib/phone'
 import { OPTIONS } from '../pro/service'
 import { ALL_QUESTIONS, QUESTIONNAIRES } from '../pro/questions'
 import { postMessage, thread } from '../pro/area'
+import { announcementPayload, DECISION_PAYLOAD, MSG_PAYLOAD, notify } from '../lib/push'
 
 type Row = Record<string, any>
 const STATUSES = ['not_submitted', 'pending_review', 'needs_changes', 'approved', 'rejected', 'suspended'] as const
@@ -155,6 +156,7 @@ export async function decide(adminId: string, userId: string, body: Record<strin
     return { from, to: t.to }
   })
   await audit('admin.decision', { userId: adminId, ip, details: { target: userId, action, ...result } })
+  await notify('messages', [userId], DECISION_PAYLOAD)
   return { ok: true, reviewStatus: result.to }
 }
 
@@ -207,6 +209,7 @@ export async function createAnnouncement(adminId: string, body: Record<string, u
   if (text.length < 3 || text.length > 2000) throw bad('invalid_body', 'O texto precisa ter de 3 a 2000 caracteres.')
   await query('INSERT INTO announcements (title, body, created_by) VALUES ($1,$2,$3)', [title, text, adminId])
   await audit('admin.announcement_created', { userId: adminId })
+  await notify('announcements', null, announcementPayload(title))
   return adminAnnouncements()
 }
 export async function setAnnouncementPublished(adminId: string, id: string, published: boolean) {
@@ -256,6 +259,7 @@ export async function sendWelcome(adminId: string, userId: string, body: unknown
     [userId, adminId, personalize(text, u.full_name).slice(0, 1000)])
   if (r.length === 0) throw new ApiError(409, 'welcome_already_sent', 'As boas-vindas já foram enviadas para este profissional.')
   await audit('admin.welcome', { userId: adminId, details: { target: userId } })
+  await notify('messages', [userId], MSG_PAYLOAD)
   return { ok: true, sent: 1 }
 }
 
@@ -266,15 +270,18 @@ export async function sendWelcomeAll(adminId: string, body: unknown) {
     `SELECT u.id, pr.full_name FROM users u LEFT JOIN professional_profiles pr ON pr.user_id = u.id
      WHERE ${ELIGIBLE} AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.user_id = u.id AND m.kind = 'welcome')`)
   let sent = 0
+  const sentTo: string[] = []
   await withTransaction(async (c) => {
     for (const r of rows) {
       const ins = await c.query(
         `INSERT INTO messages (user_id, sender, sender_user_id, kind, body) VALUES ($1,'admin',$2,'welcome',$3) ON CONFLICT (user_id) WHERE kind = 'welcome' DO NOTHING RETURNING id`,
         [r.id, adminId, personalize(text, r.full_name).slice(0, 1000)])
       sent += ins.rows.length
+      if (ins.rows.length) sentTo.push(r.id as string)
     }
   })
   const info = await welcomeInfo()
   await audit('admin.welcome_all', { userId: adminId, details: { sent } })
+  await notify('messages', sentTo, MSG_PAYLOAD)
   return { ok: true, sent, alreadyHad: info.total - sent, total: info.total }
 }

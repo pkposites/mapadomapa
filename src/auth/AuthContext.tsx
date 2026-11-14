@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api, ApiError, type Me } from '../lib/api'
+import { disablePush } from '../lib/push'
 
 type AuthState = {
   user: Me['user'] | null
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     // Se o servidor não confirmar, NÃO fingimos que saiu: a sessão continuaria válida lá.
     // O erro sobe para a tela mostrar uma mensagem e permitir tentar de novo.
+    await Promise.race([disablePush(), new Promise((r) => setTimeout(r, 3000))]) // este aparelho deixa de receber avisos desta conta
     await api.post('/auth/logout')
     hint.set(false)
     setUser(null)

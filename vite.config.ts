@@ -65,13 +65,14 @@ export default defineConfig(({ command }) => {
       workbox: {
         navigateFallback: '/index.html',
         // Versão nova assume sem reinstalar; nada de /api entra no cache (cadastro e mensagens sempre frescos).
+        importScripts: ['push-sw.js'], // avisos push (public/push-sw.js)
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // A landing é em português: só precisamos dos subconjuntos latinos da fonte.
-        globIgnores: ['**/*cyrillic*', '**/*greek*', '**/*vietnamese*'],
+        globIgnores: ['**/*cyrillic*', '**/*greek*', '**/*vietnamese*', '**/push-sw.js'],
       },
     }),
   ],
