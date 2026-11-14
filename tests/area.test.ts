@@ -43,12 +43,16 @@ describe('Início e perfil', () => {
     const u = await mkUser()
     const h = (await u.call('GET', '/pro/home')).body
     expect(h).toMatchObject({ status: 'not_submitted', statusLabel: 'Cadastro incompleto', firstName: null })
-    expect(h.pendencies.map((p: any) => p.id)).toEqual(expect.arrayContaining(['name', 'finish']))
+    expect(h.pendencies.map((p: any) => p.id)).toEqual(expect.arrayContaining(['name', 'finish', 'photo', 'bio', 'services']))
+    expect(h.pendencies.filter((p: any) => p.required).map((p: any) => p.id).sort()).toEqual(['finish', 'name'])
+    expect(h).toMatchObject({ profilePrepared: false, submitted: false })
     expect(h.announcements.length).toBeGreaterThan(0) // comunicado de boas-vindas
     expect((await u.call('PUT', '/pro/me', { fullName: 'Jo', bio: 'x' })).body.error.code).toBe('invalid_name')
     const me = (await u.call('PUT', '/pro/me', { fullName: 'Maria Souza', bio: 'Pinto há 7 anos.', services: 'Pintura interna', extraInfo: '' })).body
     expect(me).toMatchObject({ fullName: 'Maria Souza', bio: 'Pinto há 7 anos.', services: 'Pintura interna', extraInfo: null })
     expect((await u.call('GET', '/pro/home')).body.firstName).toBe('Maria')
+    expect((await u.call('PUT', '/pro/photo', { dataUrl: jpeg })).status).toBe(200)
+    expect((await u.call('GET', '/pro/home')).body.profilePrepared).toBe(true) // nome + apresentação + serviços + foto
     expect((await query<any>('SELECT full_name FROM professional_profiles WHERE user_id = $1', [u.id]))[0].full_name).toBe('Maria Souza') // gravou no banco
   })
   it('cada profissional só vê/edita os PRÓPRIOS dados', async () => {

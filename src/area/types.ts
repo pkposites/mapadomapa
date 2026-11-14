@@ -5,6 +5,7 @@ export type Home = {
   decision: { action: string; notes: string | null; at: string } | null
   pendencies: { id: string; text: string; to: string; required: boolean }[]
   unreadMessages: number; unreadAnnouncements: number; announcements: Announcement[]; hasPhoto: boolean
+  profilePrepared: boolean; submitted: boolean
 }
 export type Me = {
   fullName: string | null; bio: string | null; services: string | null; extraInfo: string | null; photoVersion: string | null
@@ -23,7 +24,7 @@ export const STATUS_TONE: Record<string, string> = {
 export const STATUS_HINT: Record<string, string> = {
   not_submitted: 'Termine o cadastro e envie para análise.',
   pending_review: 'Nossa equipe está analisando. Você será avisado aqui.',
-  approved: `Seu cadastro foi aprovado. Os pedidos reais começam em ${OPEN}.`,
+  approved: `Seu cadastro foi aprovado. Os pedidos reais estão previstos a partir de ${OPEN}.`,
   needs_changes: 'Precisamos de ajustes. Veja a orientação abaixo e reenvie.',
   rejected: 'Seu cadastro não foi aprovado. Fale com a equipe se tiver dúvidas.',
   suspended: 'Seu cadastro está suspenso. Fale com a equipe pela caixa de mensagens.',
@@ -33,7 +34,7 @@ export const STATUS_HINT: Record<string, string> = {
 export const NEXT_STEPS: Record<string, string[]> = {
   not_submitted: ['Escolha até 2 profissões e 2 regiões.', 'Responda às perguntas rápidas.', 'Envie o cadastro para análise da equipe.'],
   pending_review: ['Aguarde a análise da equipe. Você será avisado aqui e em Mensagens.', 'Enquanto isso, você pode completar a foto e a apresentação no seu perfil.'],
-  approved: ['Complete seu perfil (foto, apresentação e serviços) para se destacar.', `Acompanhe os comunicados: os pedidos de orçamento começam em ${OPEN}.`, 'Indique outros profissionais para o pré-cadastro.'],
+  approved: ['Complete seu perfil (foto, apresentação e serviços) para deixar seu perfil completo.', `Acompanhe os comunicados: os pedidos de orçamento estão previstos a partir de ${OPEN}.`, 'Indique outros profissionais para o pré-cadastro.'],
   needs_changes: ['Leia a orientação da equipe acima.', 'Ajuste o cadastro e envie de novo para análise.'],
   rejected: ['Se tiver dúvidas sobre a decisão, converse com a equipe em Mensagens.'],
   suspended: ['Converse com a equipe em Mensagens para entender o motivo e como regularizar.'],

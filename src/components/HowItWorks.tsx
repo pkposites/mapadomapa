@@ -1,5 +1,5 @@
 import Reveal from './Reveal'
-import { STEPS } from '../data/steps'
+import { STEPS } from '../data/content'
 
 export default function HowItWorks() {
   return (
@@ -10,7 +10,7 @@ export default function HowItWorks() {
             Como funciona
           </p>
           <h2 className="mt-3 max-w-[16ch] text-balance text-[28px] font-bold leading-[1.1] tracking-[-0.02em] md:text-[40px]">
-            Do cadastro ao primeiro pedido
+            Do cadastro ao início dos pedidos
           </h2>
         </Reveal>
 

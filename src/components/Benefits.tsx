@@ -1,12 +1,12 @@
-import { MapPin, Smartphone, SlidersHorizontal, BadgeCheck } from 'lucide-react'
+import { ClipboardList, MessageSquare, Smartphone, UserRound } from 'lucide-react'
 import Reveal from './Reveal'
-import { BENEFITS } from '../data/steps'
+import { BENEFITS } from '../data/content'
 
 const ICONS = {
-  gratis: BadgeCheck,
-  regiao: MapPin,
+  perfil: UserRound,
+  oportunidades: ClipboardList,
   celular: Smartphone,
-  controle: SlidersHorizontal,
+  equipe: MessageSquare,
 } as const
 
 export default function Benefits() {
@@ -18,15 +18,15 @@ export default function Benefits() {
             Por que se cadastrar
           </p>
           <h2 className="mt-3 max-w-[18ch] text-balance text-[28px] font-bold leading-[1.1] tracking-[-0.02em] md:text-[40px]">
-            Feito para quem vive de bons serviços
+            O que você ganha ao se cadastrar
           </h2>
         </Reveal>
 
-        <div className="mt-10 grid gap-3 md:mt-12 md:grid-cols-3 md:gap-4">
+        <div className="mt-10 grid gap-3 md:mt-12 md:grid-cols-2 md:gap-4">
           {BENEFITS.map((b, i) => {
             const Icon = ICONS[b.id]
             const featured = i === 0
-            const wide = i === 0 || i === 3
+            const wide = false
             return (
               <Reveal
                 key={b.id}

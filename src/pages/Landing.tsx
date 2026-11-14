@@ -5,6 +5,8 @@ import Hero from '../components/Hero'
 import Categories from '../components/Categories'
 import HowItWorks from '../components/HowItWorks'
 import Faq from '../components/Faq'
+import Availability from '../components/Availability'
+import Transparency from '../components/Transparency'
 import Benefits from '../components/Benefits'
 import LaunchCta from '../components/LaunchCta'
 import Footer from '../components/Footer'
@@ -18,9 +20,11 @@ export default function Landing() {
       <Header />
       <main>
         <Hero />
-        <Categories />
-        <HowItWorks />
         <Benefits />
+        <HowItWorks />
+        <Availability />
+        <Categories />
+        <Transparency />
         <Faq />
         <LaunchCta />
       </main>

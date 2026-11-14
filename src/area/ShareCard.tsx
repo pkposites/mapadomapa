@@ -16,7 +16,7 @@ export default function ShareCard() {
   }
   const share = async () => { try { await navigator.share({ title: 'Mapa do Mapa', text: TEXT, url }) } catch { /* cancelado */ } }
   return (
-    <section className="rounded-3xl bg-white p-5" aria-label="Indique o Mapa do Mapa" data-testid="share-card">
+    <section id="indicar" className="rounded-3xl bg-white p-5" aria-label="Indique o Mapa do Mapa" data-testid="share-card">
       <p className="text-[18px] font-bold">Indique o Mapa do Mapa</p>
       <p className="mt-1 text-[15px] leading-snug text-muted">Conhece outro profissional? Convide para o pré-cadastro gratuito do Mapa do Mapa.</p>
       <div className="mt-4 grid grid-cols-2 gap-3">

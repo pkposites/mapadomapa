@@ -42,6 +42,7 @@ export async function home(userId: string) {
   if (status === 'needs_changes') pendencies.push({ id: 'changes', text: 'A equipe pediu ajustes no seu cadastro. Leia a orientação e reenvie.', to: '/profissional', required: true })
   if (!hasPhoto) pendencies.push({ id: 'photo', text: 'Adicione uma foto de perfil.', to: '/area/perfil', required: false })
   if (!p.bio) pendencies.push({ id: 'bio', text: 'Escreva uma apresentação profissional.', to: '/area/perfil', required: false })
+  if (!p.services) pendencies.push({ id: 'services', text: 'Descreva os serviços que você realiza.', to: '/area/perfil', required: false })
 
   const announcements = await query<Row>(
     `SELECT a.id, a.title, a.body, a.created_at, (r.user_id IS NOT NULL) AS read
@@ -55,6 +56,8 @@ export async function home(userId: string) {
     pendencies, unreadMessages, unreadAnnouncements,
     announcements: announcements.map((a) => ({ id: String(a.id), title: a.title as string, body: a.body as string, at: a.created_at, read: a.read as boolean })),
     hasPhoto,
+    // "Perfil preparado": nome, apresentação, serviços e foto preenchidos (a jornada mostra só o que é real)
+    profilePrepared: Boolean(p.full_name && p.bio && p.services && hasPhoto), submitted: status !== 'not_submitted',
   }
 }
 

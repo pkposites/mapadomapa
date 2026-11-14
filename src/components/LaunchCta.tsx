@@ -15,7 +15,7 @@ export default function LaunchCta() {
             <div>
               <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-lime">
                 <CalendarDays size={18} strokeWidth={2} aria-hidden="true" />
-                Abertura dos pedidos
+                Pedidos reais previstos para
               </p>
               <p className="mt-4 text-[length:min(56px,calc((100vw-96px)/5.4))] font-bold leading-none tracking-[-0.04em] md:text-[80px] lg:text-[88px]">
                 {SITE.requestsOpenLabel}
@@ -38,8 +38,7 @@ export default function LaunchCta() {
                 )}
               </p>
               <p className="mt-6 max-w-md text-[17px] leading-relaxed text-on-dark md:text-lg">
-                O pré-cadastro de profissionais está aberto agora e é gratuito. Cadastre-se e saia na frente: os pedidos de orçamento em{' '}
-                {SITE.city} começam em {SITE.requestsOpenLabel}.
+                O pré-cadastro de profissionais está aberto agora e é gratuito. A aprovação depende de análise da equipe e o cadastro não garante pedidos, contratação nem rendimento.
               </p>
             </div>
 

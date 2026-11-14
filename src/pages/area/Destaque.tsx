@@ -4,7 +4,6 @@ import { ArrowLeft, BadgeCheck, CheckCircle2, ListChecks, Rocket, Sparkles } fro
 import AreaShell from '../../area/Shell'
 import Alert from '../../components/ui/Alert'
 import Spinner from '../../components/ui/Spinner'
-import { SITE } from '../../config/site'
 import SubmitButton from '../../components/ui/SubmitButton'
 import { api, ApiError } from '../../lib/api'
 
@@ -33,22 +32,21 @@ export default function Destaque() {
     <AreaShell>
       <Link to="/area" className="inline-flex min-h-11 items-center gap-2 text-[15px] font-semibold"><ArrowLeft size={18} aria-hidden="true" /> Voltar</Link>
       <h1 className="mt-1 text-[28px] font-bold leading-tight tracking-[-0.03em]">Quero ter destaque</h1>
-      <p className="mt-1 text-[16px] leading-snug text-muted">Receba serviços com mais frequência com um perfil que aparece mais e se apresenta melhor.</p>
+      <p className="mt-1 text-[16px] leading-snug text-muted">Conte para a gente se isso interessa a você. É só uma pesquisa, sem compromisso.</p>
 
-      <section className="mt-5 rounded-3xl bg-graphite p-5 text-white" aria-label="Meta">
-        <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-lime"><Rocket size={16} aria-hidden="true" /> Nossa meta</p>
-        <p className="mt-2 flex items-end gap-3"><span className="text-[56px] font-bold leading-none tracking-[-0.04em] text-lime">3+</span><span className="pb-1 text-[17px] leading-tight">contatos de clientes<br />por semana</span></p>
-        <p className="mt-3 text-[13px] leading-snug text-on-dark">Meta de referência, <strong className="text-white">sem garantia</strong>. Depende da profissão, da região e da demanda, e os pedidos reais começam em {SITE.requestsOpenLabel}.</p>
+      <section className="mt-5 rounded-3xl bg-graphite p-5 text-white" aria-label="Em estudo">
+        <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-lime"><Rocket size={16} aria-hidden="true" /> Possibilidade futura</p>
+        <p className="mt-2 text-[17px] leading-snug">Estamos estudando uma forma de dar mais destaque a quem quiser. <strong>Não há data, regra ou valor definidos</strong>, e não garantimos quantidade de clientes, pedidos ou renda.</p>
       </section>
 
       <section className="mt-5 rounded-3xl bg-white p-5">
-        <h2 className="text-[18px] font-bold">O que o Destaque deve oferecer</h2>
+        <h2 className="text-[18px] font-bold">O que estamos estudando</h2>
         <ul className="mt-3 space-y-3 text-[15px] leading-snug">
-          <li className="flex gap-3"><Sparkles size={20} className="mt-0.5 shrink-0" aria-hidden="true" /><span><strong>Prioridade na sua região:</strong> seu perfil aparece antes para quem pede orçamento.</span></li>
+          <li className="flex gap-3"><Sparkles size={20} className="mt-0.5 shrink-0" aria-hidden="true" /><span><strong>Mais visibilidade:</strong> seu perfil poderia aparecer com mais destaque.</span></li>
           <li className="flex gap-3"><ListChecks size={20} className="mt-0.5 shrink-0" aria-hidden="true" /><span><strong>Apresentação mais completa:</strong> mais espaço para mostrar seu trabalho e seus diferenciais.</span></li>
-          <li className="flex gap-3"><BadgeCheck size={20} className="mt-0.5 shrink-0" aria-hidden="true" /><span><strong>Selo de destaque</strong> que passa mais confiança ao cliente.</span></li>
+          <li className="flex gap-3"><BadgeCheck size={20} className="mt-0.5 shrink-0" aria-hidden="true" /><span><strong>Selo de destaque</strong> para identificar o perfil.</span></li>
         </ul>
-        <p className="mt-3 rounded-2xl bg-ice p-3 text-[14px] leading-snug">Ainda <strong>não está disponível</strong> e <strong>não cobramos nada agora</strong>. Registrando seu interesse, você ajuda a definir o plano e fala com a equipe antes de qualquer cobrança.</p>
+        <p className="mt-3 rounded-2xl bg-ice p-3 text-[14px] leading-snug">Ainda <strong>não está disponível</strong> e <strong>não cobramos nada</strong>. Registrar interesse não é compromisso: ajuda a equipe a decidir o que fazer, e condições comerciais, se existirem, serão informadas antes de qualquer cobrança.</p>
       </section>
 
       {!d && !err && <div className="mt-8 flex justify-center"><Spinner /></div>}

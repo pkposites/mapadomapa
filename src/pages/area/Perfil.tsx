@@ -48,11 +48,12 @@ export default function Perfil() {
     setWork({ weekdays: m.availability?.weekdays ?? [], periods: m.availability?.periods ?? [], emergency: m.availability?.emergency ?? false, ownTools: m.ownTools ?? '', vehicle: m.vehicle ?? '', workStructure: m.workStructure ?? '' })
     setRegs(m.regions)
   }
+  // Carrega o perfil UMA vez (antes dependia de "user" e podia apagar o que a pessoa já tinha digitado).
   useEffect(() => {
     api.get<Me>('/pro/me').then(apply).catch(() => setMsg({ tone: 'error', text: 'Não foi possível carregar o perfil.', at: 'top' }))
     api.get<Catalog>('/pro/catalog').then(setCat).catch(() => undefined)
-    if (user) setPhone({ phone: user.phone, verified: user.phoneVerified })
-  }, [user])
+  }, [])
+  useEffect(() => { if (user) setPhone({ phone: user.phone, verified: user.phoneVerified }) }, [user])
 
   const run = async (key: string, fn: () => Promise<Me>, ok: string) => {
     setBusy(key); setMsg(null)
