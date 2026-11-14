@@ -9,7 +9,7 @@ import AdminGate from '../admin/AdminGate'
 import { api, ApiError } from '../lib/api'
 
 type Cm = { id: string; body: string; hidden: boolean; at: string; authorName: string | null }
-type Item = { id: string; body: string; hidden: boolean; hiddenReason: string | null; at: string; reports: number; comments: number; authorId: string; authorName: string | null; authorPhone: string | null }
+type Item = { id: string; title: string | null; topic: string; body: string; hidden: boolean; hiddenReason: string | null; at: string; reports: number; comments: number; authorId: string; authorName: string | null; authorPhone: string | null }
 export default function AdminMural() { return <AdminGate><Page /></AdminGate> }
 function Page() {
   const [items, setItems] = useState<Item[] | null>(null)
@@ -35,7 +35,8 @@ function Page() {
       <ul className="mt-5 space-y-3">{items?.map((p) => (
         <li key={p.id} className={`rounded-2xl p-4 ${p.hidden ? 'bg-white/60' : 'bg-white'}`}>
           <p className="text-[15px] font-semibold">{p.authorName ?? 'Sem nome'} <span className="font-normal text-muted">· {p.authorPhone} · {new Date(p.at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span></p>
-          <p className="mt-2 whitespace-pre-line break-words text-[15px]">{p.body}</p>
+          {p.title && <p className="mt-2 text-[16px] font-bold">{p.title} <span className="text-[12px] font-medium text-muted">· {p.topic}</span></p>}
+          <p className="mt-1 whitespace-pre-line break-words text-[15px]">{p.body}</p>
           <p className="mt-2 text-[13px] text-muted">{p.reports > 0 && <strong className="text-danger">{p.reports} denúncia(s) · </strong>}{p.hidden ? `Oculta${p.hiddenReason ? `: ${p.hiddenReason}` : ''}` : 'Visível'}</p>
           <div className="mt-2 flex gap-4">
             <button type="button" onClick={() => void set(p.id, !p.hidden)} className="min-h-11 text-[14px] font-semibold underline">{p.hidden ? 'Mostrar de novo' : 'Ocultar'}</button>
