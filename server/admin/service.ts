@@ -29,7 +29,8 @@ export async function stats() {
   return { byStatus, unverifiedPhones: unverified, unreadMessages }
 }
 
-export async function list(params: { status?: unknown; q?: unknown; page?: unknown }) {
+export async function list(params: { status?: unknown; q?: unknown; page?: unknown; phone?: unknown }) {
+  const onlyUnverified = params.phone === 'unverified'
   const status = typeof params.status === 'string' && (STATUSES as readonly string[]).includes(params.status) ? params.status : null
   const digits = typeof params.q === 'string' ? params.q.replace(/\D/g, '').slice(0, 13) : ''
   const page = Math.max(1, Math.min(500, Number(params.page) || 1))
@@ -47,11 +48,12 @@ export async function list(params: { status?: unknown; q?: unknown; page?: unkno
      WHERE NOT EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id AND r.name = 'admin')
        AND ($1::text IS NULL OR COALESCE(pr.review_status, 'not_submitted') = $1)
        AND ($2 = '' OR ph.e164 LIKE '%' || $2 || '%')
+       AND (NOT $5::boolean OR ph.verified_at IS NULL)
      ORDER BY (COALESCE(pr.review_status, 'not_submitted') = 'pending_review') DESC, COALESCE(pr.submitted_at, u.created_at) DESC
-     LIMIT $3 OFFSET $4`, [status, digits, size + 1, (page - 1) * size])
+     LIMIT $3 OFFSET $4`, [status, digits, size + 1, (page - 1) * size, onlyUnverified])
   return {
     items: rows.slice(0, size).map((r) => ({
-      id: r.id as string, name: (r.full_name ?? null) as string | null, unread: r.unread as number, phone: formatNational(r.e164), phoneVerified: r.phone_verified as boolean, createdAt: r.created_at,
+      id: r.id as string, name: (r.full_name ?? null) as string | null, unread: r.unread as number, phone: formatNational(r.e164), whatsapp: String(r.e164).replace(/\D/g, ''), phoneVerified: r.phone_verified as boolean, createdAt: r.created_at,
       accountStatus: r.user_status as string, reviewStatus: r.review_status as string, submittedAt: r.submitted_at,
       professions: (r.professions ?? []) as string[], regions: (r.regions ?? []) as string[], bestScore: r.best_score as number | null, flagged: r.flagged as number,
     })),
@@ -83,6 +85,7 @@ export async function detail(adminId: string, userId: string, ip?: string) {
     `SELECT e.action, e.from_status, e.to_status, e.notes, e.created_at FROM review_events e WHERE e.user_id = $1 ORDER BY e.created_at DESC, e.id DESC LIMIT 30`, [userId])
   const pevents = await query<Row>(`SELECT kind, details, created_at FROM profile_events WHERE user_id = $1 ORDER BY created_at DESC, id DESC LIMIT 30`, [userId])
   const hasPhoto = (await query('SELECT 1 FROM profile_photos WHERE user_id = $1', [userId])).length > 0
+  const lastWa = (await query<Row>(`SELECT created_at FROM audit_log WHERE event = 'admin.whatsapp_contact' AND details->>'target' = $1 ORDER BY id DESC LIMIT 1`, [userId]))[0]
   const unread = (await query<Row>(`SELECT count(*)::int n FROM messages WHERE user_id = $1 AND sender = 'professional' AND read_at IS NULL`, [userId]))[0].n
   const lv = (id: string | null) => OPTIONS.levels.find((l) => l.id === id)?.label ?? null
   const opt = (list: readonly { id: string; label: string }[], id: string | null) => list.find((o) => o.id === id)?.label ?? null
@@ -93,7 +96,7 @@ export async function detail(adminId: string, userId: string, ip?: string) {
     id: u.id as string, fullName: (pr?.full_name ?? null) as string | null, bio: (pr?.bio ?? null) as string | null, services: (pr?.services ?? null) as string | null,
     extraInfo: (pr?.extra_info ?? null) as string | null, hasPhoto, unreadMessages: unread, welcomeSent: (await query('SELECT 1 FROM messages WHERE user_id = $1 AND kind = \'welcome\'', [userId])).length > 0,
     profileEvents: pevents.map((e) => ({ kind: e.kind as string, details: e.details as string | null, at: e.created_at })),
-    phone: formatNational(u.e164), phoneVerified: Boolean(u.verified_at), phoneVerifiedAt: u.verified_at,
+    phone: formatNational(u.e164), whatsappPhone: String(u.e164).replace(/\D/g, ''), lastWhatsApp: (lastWa?.created_at ?? null) as string | null, phoneVerified: Boolean(u.verified_at), phoneVerifiedAt: u.verified_at,
     accountStatus: u.status as string, createdAt: u.created_at, lastLoginAt: u.last_login_at,
     reviewStatus: (pr?.review_status ?? 'not_submitted') as string, submittedAt: pr?.submitted_at ?? null, reviewNotes: pr?.review_notes ?? null, reviewedAt: pr?.reviewed_at ?? null,
     work: pr ? { availability: pr.availability, ownTools: opt(OPTIONS.ownTools, pr.own_tools), vehicle: opt(OPTIONS.vehicle, pr.vehicle), workStructure: opt(OPTIONS.workStructure, pr.work_structure) } : null,
@@ -150,6 +153,11 @@ export async function decide(adminId: string, userId: string, body: Record<strin
     await c.query('UPDATE professional_profiles SET review_status = $2, reviewed_by = $3, reviewed_at = $4, review_notes = $5, updated_at = $4 WHERE user_id = $1',
       [userId, t.to, adminId, now(), notes || null])
     await c.query('INSERT INTO review_events (user_id, admin_id, action, from_status, to_status, notes) VALUES ($1,$2,$3,$4,$5,$6)', [userId, adminId, action, from, t.to, notes || null])
+    // "Aprovar e verificar celular": um único gesto do administrador (registrado no histórico).
+    if (action === 'approve' && body.verifyPhone === true) {
+      const v = await c.query(`UPDATE phones SET verified_at = $2, verified_by = $3 WHERE user_id = $1 AND is_primary AND verified_at IS NULL RETURNING 1`, [userId, now(), adminId])
+      if (v.rows.length) await c.query(`INSERT INTO review_events (user_id, admin_id, action, from_status, to_status) VALUES ($1,$2,'verify_phone',NULL,NULL)`, [userId, adminId])
+    }
     // A decisão também chega ao profissional pela caixa de mensagens.
     const msg = ({ approve: 'Seu cadastro foi aprovado!', reinstate: 'Seu cadastro foi reativado.', reject: 'Seu cadastro não foi aprovado.',
       request_changes: 'Precisamos de ajustes no seu cadastro.', suspend: 'Seu cadastro foi suspenso.' } as Record<string, string>)[action]
@@ -285,4 +293,11 @@ export async function sendWelcomeAll(adminId: string, body: unknown) {
   await audit('admin.welcome_all', { userId: adminId, details: { sent } })
   await notify('messages', sentTo, MSG_PAYLOAD)
   return { ok: true, sent, alreadyHad: info.total - sent, total: info.total }
+}
+
+/** Registra que o administrador abriu o WhatsApp deste profissional (o contato em si acontece fora da plataforma). */
+export async function logWhatsApp(adminId: string, userId: string, ip?: string) {
+  if (!(await query('SELECT 1 FROM users WHERE id = $1', [userId])).length) throw new ApiError(404, 'not_found', 'Profissional não encontrado.')
+  await audit('admin.whatsapp_contact', { userId: adminId, ip, details: { target: userId } })
+  return { ok: true }
 }

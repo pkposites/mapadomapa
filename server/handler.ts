@@ -168,13 +168,14 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   // ---------- Administração (apenas a base: guarda de permissão; painel vem depois) ----------
   if (path.startsWith('/admin/') && path !== '/admin/ping') {
     const admin = requireAdmin(await loadSession(token))
-    const m = path.match(/^\/admin\/professionals\/([0-9a-f-]{36})(\/decision|\/phone|\/messages|\/photo|\/welcome)?$/)
+    const m = path.match(/^\/admin\/professionals\/([0-9a-f-]{36})(\/decision|\/phone|\/messages|\/photo|\/welcome|\/whatsapp-log)?$/)
     if (method === 'GET' && path === '/admin/stats') return json(await adm.stats())
-    if (method === 'GET' && path === '/admin/professionals') return json(await adm.list({ status: url.searchParams.get('status'), q: url.searchParams.get('q'), page: url.searchParams.get('page') }))
+    if (method === 'GET' && path === '/admin/professionals') return json(await adm.list({ status: url.searchParams.get('status'), q: url.searchParams.get('q'), page: url.searchParams.get('page'), phone: url.searchParams.get('phone') }))
     if (m && method === 'GET' && !m[2]) return json(await adm.detail(admin.userId, m[1], ctx.ip))
     if (m && method === 'GET' && m[2] === '/messages') return json(await adm.threadFor(m[1]))
     if (m && method === 'POST' && m[2] === '/messages') return json(await adm.sendMessage(admin.userId, m[1], (await readJson(req)).body))
     if (m && method === 'GET' && m[2] === '/photo') return photoResponse(await area.getPhoto(m[1]))
+    if (m && method === 'POST' && m[2] === '/whatsapp-log') return json(await adm.logWhatsApp(admin.userId, m[1], ctx.ip))
     if (m && method === 'POST' && m[2] === '/welcome') return json(await adm.sendWelcome(admin.userId, m[1], (await readJson(req)).body))
     if (method === 'GET' && path === '/admin/welcome') return json(await adm.welcomeInfo())
     if (method === 'POST' && path === '/admin/welcome-all') return json(await adm.sendWelcomeAll(admin.userId, (await readJson(req)).body))

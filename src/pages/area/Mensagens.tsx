@@ -10,7 +10,7 @@ import type { Msg } from '../../area/types'
 
 const fmt = (d: string) => new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
-export function Thread({ load, send, mine }: { load: () => Promise<Msg[]>; send: (body: string) => Promise<Msg[]>; mine: 'admin' | 'professional' }) {
+export function Thread({ load, send, mine, hideComposer = false, reloadKey = 0 }: { load: () => Promise<Msg[]>; send: (body: string) => Promise<Msg[]>; mine: 'admin' | 'professional'; hideComposer?: boolean; reloadKey?: number }) {
   const [msgs, setMsgs] = useState<Msg[] | null>(null)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -22,8 +22,8 @@ export function Thread({ load, send, mine }: { load: () => Promise<Msg[]>; send:
     const on = () => { if (document.visibilityState === 'visible') void refresh() }
     document.addEventListener('visibilitychange', on)
     return () => document.removeEventListener('visibilitychange', on)
-  }, [refresh])
-  useEffect(() => { end.current?.scrollIntoView({ block: 'end' }) }, [msgs])
+  }, [refresh, reloadKey])
+  useEffect(() => { if (!hideComposer) end.current?.scrollIntoView({ block: 'end' }) }, [msgs, hideComposer])
 
   const submit = async () => {
     if (!text.trim()) return
@@ -49,12 +49,12 @@ export function Thread({ load, send, mine }: { load: () => Promise<Msg[]>; send:
       </ul>
       <div ref={end} />
       {err && <div className="mt-3"><Alert tone="error">{err}</Alert></div>}
-      <div className="mt-4 rounded-3xl bg-white p-4">
+      {!hideComposer && <div className="mt-4 rounded-3xl bg-white p-4">
         <label htmlFor="msg" className="sr-only">Mensagem</label>
         <textarea id="msg" rows={3} maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Escreva sua mensagem…"
           className="block w-full resize-none rounded-2xl border border-line p-3 text-[16px] focus:outline-2 focus:outline-offset-2 focus:outline-graphite" />
         <div className="mt-3"><SubmitButton type="button" loading={busy} disabled={!text.trim()} onClick={submit}><Send size={18} aria-hidden="true" /> Enviar</SubmitButton></div>
-      </div>
+      </div>}
     </div>
   )
 }

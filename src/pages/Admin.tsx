@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ChevronRight, Megaphone, MessageSquare, ShieldAlert, Search } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Megaphone, MessageCircle, MessageSquare, ShieldAlert, Search } from 'lucide-react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import Alert from '../components/ui/Alert'
@@ -8,6 +8,7 @@ import Spinner from '../components/ui/Spinner'
 import SubmitButton from '../components/ui/SubmitButton'
 import AdminGate from '../admin/AdminGate'
 import WelcomeBox from '../admin/WelcomeBox'
+import { personalize, TEMPLATES, waUrl } from '../admin/contact'
 import StatusBadge from '../admin/StatusBadge'
 import { STATUS_LABEL, type Item, type Stats, type Status } from '../admin/types'
 import { api, ApiError } from '../lib/api'
@@ -23,6 +24,7 @@ function Panel() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [status, setStatus] = useState<Status | ''>('pending_review')
   const [q, setQ] = useState('')
+  const [unver, setUnver] = useState(false) // só celulares ainda não verificados
   const [items, setItems] = useState<Item[]>([])
   const [page, setPage] = useState(1)
   const [more, setMore] = useState(false)
@@ -32,10 +34,10 @@ function Panel() {
   const load = useCallback(async (reset: boolean, p = 1) => {
     setBusy(true); setErr(null)
     try {
-      const r = await api.get<{ items: Item[]; page: number; hasMore: boolean }>(`/admin/professionals?status=${status}&q=${encodeURIComponent(q)}&page=${p}`)
+      const r = await api.get<{ items: Item[]; page: number; hasMore: boolean }>(`/admin/professionals?status=${status}&q=${encodeURIComponent(q)}&page=${p}${unver ? '&phone=unverified' : ''}`)
       setItems((cur) => (reset ? r.items : [...cur, ...r.items])); setPage(r.page); setMore(r.hasMore)
     } catch (e) { setErr(e instanceof ApiError ? e.message : 'Não foi possível carregar a lista.') } finally { setBusy(false) }
-  }, [status, q])
+  }, [status, q, unver])
 
   const [welcome, setWelcome] = useState<{ template: string; total: number; pending: number } | null>(null)
   useEffect(() => { api.get<Stats>('/admin/stats').then(setStats).catch(() => undefined); api.get<{ template: string; total: number; pending: number }>('/admin/welcome').then(setWelcome).catch(() => undefined) }, [])
@@ -77,7 +79,11 @@ function Panel() {
               </button>
             ))}
           </div>
-          {stats && stats.unverifiedPhones > 0 && <p className="mt-3 flex items-center gap-2 text-[14px] text-muted"><ShieldAlert size={18} aria-hidden="true" /> {stats.unverifiedPhones} celular(es) ainda não verificado(s).</p>}
+          {stats && stats.unverifiedPhones > 0 && (
+            <button type="button" aria-pressed={unver} onClick={() => setUnver((v) => !v)} data-testid="filter-unverified" className={`mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-[14px] font-medium ${unver ? 'border-graphite bg-graphite text-white' : 'border-line bg-white'}`}>
+              <ShieldAlert size={18} aria-hidden="true" /> {unver ? 'Mostrando só celulares não verificados' : `${stats.unverifiedPhones} celular(es) não verificado(s) — filtrar`}
+            </button>
+          )}
 
           <label htmlFor="q" className="mt-5 block text-[15px] font-semibold">Buscar por celular</label>
           <div className="relative mt-2">
@@ -89,8 +95,8 @@ function Panel() {
           {err && <div className="mt-4"><Alert tone="error">{err}</Alert></div>}
           <ul className="mt-5 space-y-3">
             {items.map((i) => (
-              <li key={i.id}>
-                <Link to={`/admin/profissionais/${i.id}`} className="block rounded-2xl bg-white p-4 transition duration-150 active:scale-[0.99]">
+              <li key={i.id} className="rounded-2xl bg-white">
+                <Link to={`/admin/profissionais/${i.id}`} className="block p-4 pb-3 transition duration-150 active:scale-[0.99]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[17px] font-semibold">{i.name ?? i.phone}{i.unread > 0 && <span className="ml-2 rounded-full bg-danger px-2 py-0.5 text-[12px] text-white">{i.unread} msg</span>}</p>
@@ -107,6 +113,12 @@ function Panel() {
                     {i.flagged > 0 && <span className="flex items-center gap-1 text-[13px] font-semibold text-danger"><AlertTriangle size={14} aria-hidden="true" /> {i.flagged} alerta(s)</span>}
                   </div>
                 </Link>
+                <div className="flex items-center gap-3 px-4 pb-3">
+                  <a href={waUrl(i.whatsapp, personalize((i.phoneVerified ? TEMPLATES[1] : TEMPLATES[0]).text, i.name))} target="_blank" rel="noopener noreferrer" data-testid="list-whatsapp"
+                    onClick={() => { void fetch(`/api/admin/professionals/${i.id}/whatsapp-log`, { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'content-type': 'application/json' }, body: '{}' }).catch(() => undefined) }}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25d366] px-4 text-[14px] font-semibold text-graphite"><MessageCircle size={16} aria-hidden="true" /> WhatsApp</a>
+                  <span className="text-[12px] text-muted">{i.phoneVerified ? 'Boas-vindas' : 'Confirmar celular'}</span>
+                </div>
               </li>
             ))}
           </ul>
