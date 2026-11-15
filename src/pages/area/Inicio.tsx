@@ -61,7 +61,7 @@ export default function Inicio() {
         <div className="space-y-5">
           {/* 1. Boas-vindas */}
           <section id="inicio" className="rounded-3xl bg-graphite p-5 text-white" aria-label="Boas-vindas" data-testid="welcome">
-            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]" data-testid="greeting">{h.firstName ? `Olá, ${h.firstName}!` : 'Olá!'}</h1>
+            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]" data-testid="greeting" data-clarity-mask="true">{h.firstName ? `Olá, ${h.firstName}!` : 'Olá!'}</h1>
             <p className="mt-2 text-[15px] leading-relaxed text-on-dark">O Mapa do Mapa vai conectar profissionais de São Paulo a pedidos de orçamento. Estamos em <strong className="text-white">pré-lançamento</strong>: você já pode preparar seu perfil.</p>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">

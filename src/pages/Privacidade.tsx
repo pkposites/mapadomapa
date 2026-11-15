@@ -33,6 +33,14 @@ const SECTIONS: LegalSection[] = [
     pending: 'Base legal de cada finalidade e eventual necessidade de consentimento específico.',
   },
   {
+    title: 'Análise de uso do site (Microsoft Clarity)',
+    body: [
+      'Usamos o Microsoft Clarity, ferramenta de análise de uso da Microsoft, para entender como o site e o aplicativo são usados (por exemplo, cliques, rolagem e navegação) e melhorar a experiência. Ele pode gravar a sessão de navegação e usar cookies ou identificadores próprios.',
+      'Essa análise carrega desde a primeira tela, em todas as páginas, e não depende da escolha feita no aviso de cookies de anúncios (Meta). Campos de telefone e senha e as áreas privadas (perfil, mensagens e administração) são mascarados: o Clarity não vê o que é digitado nem o conteúdo dessas telas. Os dados são processados pela Microsoft, com os termos e a política de privacidade dela.',
+    ],
+    pending: 'Base legal (por exemplo, legítimo interesse, com avaliação), transferência internacional de dados, prazo de retenção no Clarity e se será oferecida opção de recusa.',
+  },
+  {
     title: 'Cookies e mensuração de anúncios (Meta)',
     body: [
       'Se você permitir, usamos o Meta Pixel (no navegador) e a Conversions API (no servidor) para medir se os anúncios do Mapa do Mapa funcionam. Quando você conclui o cadastro, podemos enviar à Meta o evento "cadastro concluído" com seu telefone protegido por criptografia irreversível (hash), nunca em texto aberto.',

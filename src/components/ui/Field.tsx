@@ -51,6 +51,7 @@ export function PhoneField({ id, label, hint, error, value, onChange, ...rest }:
         <input
           {...rest}
           id={id}
+          data-clarity-mask="true"
           type="tel"
           inputMode="tel"
           autoComplete="tel-national"
@@ -74,6 +75,7 @@ export function PasswordField({ id, label, hint, error, value, onChange, autoCom
         <input
           {...rest}
           id={id}
+          data-clarity-mask="true"
           type={shown ? 'text' : 'password'}
           autoComplete={autoComplete}
           autoCapitalize="none"

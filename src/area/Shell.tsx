@@ -34,7 +34,8 @@ export default function AreaShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-30 bg-graphite pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-14 max-w-lg items-center px-5"><Logo /></div>
       </header>
-      <main className="mx-auto max-w-lg px-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-6">{children}</main>
+      {/* Perfil e Mensagens têm dados pessoais: o Clarity não grava o conteúdo destas telas */}
+      <main data-clarity-mask={pathname.startsWith('/area/perfil') || pathname.startsWith('/area/mensagens') ? 'true' : undefined} className="mx-auto max-w-lg px-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-6">{children}</main>
       <nav aria-label="Área do profissional" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
         <ul className="mx-auto grid max-w-lg grid-cols-5">
           {TABS.map(({ to, label, Icon, end }) => (
