@@ -148,7 +148,7 @@ export default function Cadastro() {
       <AuthShell
         eyebrow="Pré-cadastro"
         title="O pré-cadastro abre em breve"
-        subtitle={<>Os pedidos de orçamento começam em <strong className="font-semibold text-graphite">{SITE.requestsOpenLabel}</strong>. Volte logo para garantir o seu lugar.</>}
+        subtitle={<>Os pedidos de orçamento estão previstos a partir de <strong className="font-semibold text-graphite">{SITE.requestsOpenLabel}</strong>. Volte em breve.</>}
         below={<>Já tem conta? <Link to="/entrar" className={standaloneLink}>Entrar</Link></>}
       >
         <Button to="/" variant="dark" fullWidth>Voltar para o início</Button>
@@ -191,11 +191,12 @@ export default function Cadastro() {
       eyebrow="Pré-cadastro gratuito"
       title="Crie sua conta"
       subtitle={vmode === 'admin'
-        ? <>Só precisamos do seu celular e de uma senha. Sua conta é criada na hora, o celular é verificado depois pela nossa equipe e seu perfil fica em análise até a aprovação. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>
-        : <>Só precisamos do seu celular e de uma senha. Não pedimos e-mail. Os pedidos de orçamento começam em {SITE.requestsOpenLabel}.</>}
+        ? <>Só precisamos do seu celular e de uma senha. Sua conta é criada na hora, o celular é verificado depois pela nossa equipe e seu perfil fica em análise até a aprovação. Os pedidos de orçamento estão previstos a partir de {SITE.requestsOpenLabel}.</>
+        : <>Só precisamos do seu celular e de uma senha. Não pedimos e-mail. Os pedidos de orçamento estão previstos a partir de {SITE.requestsOpenLabel}.</>}
       below={<>Já tem conta? <Link to="/entrar" className={standaloneLink}>Entrar</Link></>}
     >
       <form onSubmit={submitForm} noValidate className="space-y-5">
+        <p className="rounded-2xl bg-ice p-3 text-[13px] leading-snug text-muted" data-testid="signup-transparency">Cadastro gratuito. A aprovação depende de análise da equipe e o cadastro <strong className="font-semibold text-graphite">não garante oportunidades, contratação nem rendimento</strong>. Condições comerciais futuras serão informadas antes de qualquer cobrança.</p>
         <div data-testid="signup-steps" aria-label="Passos do cadastro">
           <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Passo 1 de 4 · Crie sua conta</p>
           <div className="mt-2 grid grid-cols-4 gap-1.5" aria-hidden="true">

@@ -1,0 +1,72 @@
+// E2E do fluxo do admin: checklist, WhatsApp/app com um clique, aprovar e verificar celular. Requer: CAPTCHA_PROVIDER=pow npx vite --port 5173
+const { chromium } = require('playwright')
+const { execSync } = require('node:child_process')
+const B = process.env.BASE_URL ?? 'http://localhost:5173'
+const rnd = (n) => String(Math.floor(Math.random() * 10 ** n)).padStart(n, '0')
+const res = []
+const check = (n, ok, x = '') => { res.push(ok); console.log(`${ok ? '  ✓' : '  ✗'} ${n}${ok ? '' : '  ← ' + x}`) }
+const hideDev = () => document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = '[data-testid=dev-sms]{display:none!important}'; document.head.appendChild(s) })
+async function signup(browser, phone) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+  await ctx.addInitScript(() => localStorage.setItem('mdm_consent_v1', JSON.stringify({ marketing: false, at: 'x' }))); await ctx.addInitScript(hideDev)
+  const page = await ctx.newPage()
+  await page.request.post(`${B}/api/dev/reset-limits`, { data: {} })
+  await page.goto(B + '/cadastro'); await page.waitForSelector('text=Verificação de segurança concluída', { timeout: 30000 })
+  await page.getByLabel('Seu celular').fill(phone); await page.getByLabel('Crie uma senha').fill('fluxo-senha-' + rnd(4)); await page.getByLabel(/Li e aceito/).check()
+  await page.getByRole('button', { name: 'Criar minha conta' }).click(); await page.waitForURL('**/profissional')
+  return { ctx, page }
+}
+;(async () => {
+  const browser = await chromium.launch()
+  const adminPhone = `(11) 9${rnd(4)}-${rnd(4)}`, proPhone = `(11) 9${rnd(4)}-${rnd(4)}`
+  const admin = await signup(browser, adminPhone); execSync(`npm run admin:grant -- "${adminPhone}"`, { stdio: 'ignore' })
+  const pro = await signup(browser, proPhone)
+  const errs = []; admin.page.on('pageerror', (e) => errs.push(String(e)))
+  // profissional completa e envia o cadastro (via API da própria sessão)
+  const pr = pro.page.request, h = { 'content-type': 'application/json', origin: B }
+  await pr.put(`${B}/api/pro/me`, { data: { fullName: 'Marcos Antônio Silva' }, headers: h })
+  await pr.put(`${B}/api/pro/professions`, { data: { professions: ['pintores'] }, headers: h }); await pr.put(`${B}/api/pro/regions`, { data: { regions: ['zona-sul'] }, headers: h })
+  await pr.put(`${B}/api/pro/work`, { data: { experience: { pintores: { years: 6, level: 'advanced' } }, availability: { weekdays: ['seg'], periods: ['manha'], emergency: false }, ownTools: 'complete', vehicle: 'car', workStructure: 'solo' }, headers: h })
+  const st = await (await pr.get(`${B}/api/pro/profile`)).json()
+  await pr.put(`${B}/api/pro/answers`, { data: { profession: 'pintores', answers: st.questionnaires.pintores.map((q) => ({ questionId: q.id, choice: q.options[0].id })) }, headers: h })
+  const sub = await pr.post(`${B}/api/pro/submit`, { data: {}, headers: h }); check('profissional enviou o cadastro para análise', sub.status() === 200, String(sub.status()))
+  const digits = '55' + proPhone.replace(/\D/g, '')
+
+  console.log('\n[1] Lista')
+  let page = admin.page
+  await page.goto(B + '/admin'); await page.waitForSelector('[data-testid=list-whatsapp]', { timeout: 20000 })
+  const href = await page.locator('[data-testid=list-whatsapp]').first().getAttribute('href')
+  check('cada cadastro tem botão WhatsApp com a conversa e o texto prontos', href.startsWith(`https://wa.me/${digits}?text=`) && /Marcos/.test(decodeURIComponent(href)) && /responda esta mensagem com OK/.test(decodeURIComponent(href)), href)
+  check('filtro "celular não verificado" disponível', (await page.locator('[data-testid=filter-unverified]').count()) === 1)
+  await page.locator('[data-testid=filter-unverified]').click(); await page.waitForTimeout(1500)
+  check('filtro mostra o cadastro com celular não verificado', /Marcos/.test(await page.locator('main').innerText()))
+
+  console.log('\n[2] Ficha: checklist, contato em um clique, aprovar e verificar')
+  await page.locator('a[href^="/admin/profissionais/"]').first().click(); await page.waitForSelector('[data-testid=checklist]')
+  const ck = await page.locator('[data-testid=checklist]').innerText()
+  check('checklist: enviado, nome, profissões/regiões e celular NÃO verificado em destaque', /Cadastro enviado/.test(ck) && /Nome informado/.test(ck) && /Pintores/.test(ck) && /Celular ainda não verificado/.test(ck))
+  check('modelo "Confirmar celular" já vem na caixa de mensagem', /responda esta mensagem com OK/.test(await page.locator('#contact-text').inputValue()))
+  const wa = await page.locator('[data-testid=send-whatsapp]').getAttribute('href')
+  check('WhatsApp usa o texto da caixa, com o primeiro nome', wa.startsWith(`https://wa.me/${digits}?text=`) && /Olá, Marcos!/.test(decodeURIComponent(wa)), wa)
+  await page.getByRole('button', { name: 'Cadastro aprovado' }).click()
+  check('trocar de modelo atualiza o link do WhatsApp', /foi aprovado/.test(decodeURIComponent(await page.locator('[data-testid=send-whatsapp]').getAttribute('href'))))
+  await page.getByRole('button', { name: 'Confirmar celular' }).click()
+  await admin.ctx.route(/wa\.me/, (r) => r.abort())
+  const popup = admin.ctx.waitForEvent('page', { timeout: 5000 }).catch(() => null)
+  await page.locator('[data-testid=send-whatsapp]').click(); const pp = await popup; if (pp) await pp.close().catch(() => {})
+  await page.waitForTimeout(1500)
+  check('clique no WhatsApp abriu a conversa (nova aba) e foi registrado', Boolean(pp))
+  await page.locator('[data-testid=send-app]').click(); await page.waitForSelector('text=Mensagem enviada no app.')
+  await page.waitForSelector('[data-testid=thread] >> text=responda esta mensagem com OK', { timeout: 15000 })
+  check('"Enviar no app" entrega na caixa de mensagens do profissional', ((await (await pr.get(`${B}/api/pro/messages`)).json()).messages ?? []).some((m) => /responda esta mensagem com OK/.test(m.body) && /Olá, Marcos!/.test(m.body)))
+  await page.getByRole('button', { name: 'Aprovar e verificar celular' }).click(); await page.waitForSelector('#notes')
+  await page.getByRole('button', { name: 'Confirmar', exact: true }).click(); await page.waitForSelector('text=Aprovar e verificar celular: feito.', { timeout: 15000 })
+  await page.waitForSelector('[data-testid=checklist] >> text=Celular verificado', { timeout: 15000 }).catch(() => {})
+  const ck2 = await page.locator('[data-testid=checklist]').innerText()
+  check('aprovado e celular verificado num único gesto', /Celular verificado/.test(ck2) && (await page.getByText('Verificado pela equipe').count()) >= 1)
+  const home = await (await pr.get(`${B}/api/pro/home`)).json()
+  check('o profissional vê "Aprovado" e a decisão chega como mensagem', home.status === 'approved' && ((await (await pr.get(`${B}/api/pro/messages`)).json()).messages ?? []).some((m) => m.kind === 'decision'))
+  check('sem rolagem horizontal e sem erros de JS', (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0 && errs.length === 0, errs.join(' | '))
+  await browser.close()
+  const ok = res.filter(Boolean).length; console.log(`\n${ok}/${res.length} verificações`); process.exit(ok === res.length ? 0 : 1)
+})()

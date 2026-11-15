@@ -15,6 +15,8 @@ import * as pro from './pro/service'
 import * as area from './pro/area'
 import * as feed from './pro/feed'
 import * as boost from './pro/boost'
+import * as areq from './admin/requests'
+import * as preq from './pro/requests'
 import * as adm from './admin/service'
 import * as auth from './services/auth'
 
@@ -142,6 +144,9 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (fp && method === 'PUT' && fp[2] === '/like') return json(await feed.setLike(me.userId, fp[1], (await readJson(req)).liked === true))
     if (fp && method === 'GET' && fp[2] === '/comments') return json(await feed.listComments(me.userId, fp[1]))
     if (fp && method === 'POST' && fp[2] === '/comments') return json(await feed.addComment(me.userId, fp[1], await readJson(req)))
+    if (method === 'GET' && path === '/pro/requests') return json(await preq.listOpportunities(me.userId))
+    const pi = path.match(/^\/pro\/requests\/(\d{1,15})\/interest$/)
+    if (pi && method === 'POST') return json(await preq.showInterest(me.userId, pi[1]))
     if (method === 'GET' && path === '/pro/boost') return json(await boost.getBoost(me.userId))
     if (method === 'PUT' && path === '/pro/boost') return json(await boost.setBoost(me.userId, await readJson(req)))
     if (method === 'DELETE' && path === '/pro/boost') return json(await boost.removeBoost(me.userId))
@@ -159,7 +164,7 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (method === 'DELETE' && path === '/pro/photo') return json(await area.removePhoto(me.userId))
     if (method === 'GET' && path === '/pro/photo') return photoResponse(await area.getPhoto(me.userId))
     if (method === 'GET' && path === '/pro/messages') return json(await area.thread(me.userId, 'professional'))
-    if (method === 'GET' && path === '/pro/messages/unread') return json({ unread: await area.unreadCount(me.userId) })
+    if (method === 'GET' && path === '/pro/messages/unread') return json(await area.shellInfo(me.userId))
     if (method === 'POST' && path === '/pro/messages') { const b = await readJson(req); return json(await area.postMessage(me.userId, 'professional', me.userId, b.body, b.kind === 'change_request' ? 'change_request' : 'message')) }
     if (method === 'GET' && path === '/pro/announcements') return json(await area.listAnnouncements(me.userId))
     if (method === 'POST' && path === '/pro/announcements/read') return json(await area.markAnnouncementsRead(me.userId))
@@ -168,16 +173,25 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   // ---------- Administração (apenas a base: guarda de permissão; painel vem depois) ----------
   if (path.startsWith('/admin/') && path !== '/admin/ping') {
     const admin = requireAdmin(await loadSession(token))
-    const m = path.match(/^\/admin\/professionals\/([0-9a-f-]{36})(\/decision|\/phone|\/messages|\/photo|\/welcome)?$/)
+    const m = path.match(/^\/admin\/professionals\/([0-9a-f-]{36})(\/decision|\/phone|\/messages|\/photo|\/welcome|\/whatsapp-log)?$/)
     if (method === 'GET' && path === '/admin/stats') return json(await adm.stats())
-    if (method === 'GET' && path === '/admin/professionals') return json(await adm.list({ status: url.searchParams.get('status'), q: url.searchParams.get('q'), page: url.searchParams.get('page') }))
+    if (method === 'GET' && path === '/admin/professionals') return json(await adm.list({ status: url.searchParams.get('status'), q: url.searchParams.get('q'), page: url.searchParams.get('page'), phone: url.searchParams.get('phone') }))
     if (m && method === 'GET' && !m[2]) return json(await adm.detail(admin.userId, m[1], ctx.ip))
     if (m && method === 'GET' && m[2] === '/messages') return json(await adm.threadFor(m[1]))
     if (m && method === 'POST' && m[2] === '/messages') return json(await adm.sendMessage(admin.userId, m[1], (await readJson(req)).body))
     if (m && method === 'GET' && m[2] === '/photo') return photoResponse(await area.getPhoto(m[1]))
+    if (m && method === 'POST' && m[2] === '/whatsapp-log') return json(await adm.logWhatsApp(admin.userId, m[1], ctx.ip))
     if (m && method === 'POST' && m[2] === '/welcome') return json(await adm.sendWelcome(admin.userId, m[1], (await readJson(req)).body))
     if (method === 'GET' && path === '/admin/welcome') return json(await adm.welcomeInfo())
     if (method === 'POST' && path === '/admin/welcome-all') return json(await adm.sendWelcomeAll(admin.userId, (await readJson(req)).body))
+    if (method === 'GET' && path === '/admin/requests') return json(await areq.listRequests(url.searchParams.get('status')))
+    if (method === 'POST' && path === '/admin/requests') return json(await areq.createRequest(admin.userId, await readJson(req)))
+    const ar = path.match(/^\/admin\/requests\/(\d{1,15})(\/publish|\/close)?$/)
+    if (ar && method === 'GET' && !ar[2]) return json(await areq.requestDetail(ar[1]))
+    if (ar && method === 'PUT' && !ar[2]) return json(await areq.updateRequest(admin.userId, ar[1], await readJson(req)))
+    if (ar && method === 'DELETE' && !ar[2]) return json(await areq.deleteDraft(admin.userId, ar[1]))
+    if (ar && method === 'POST' && ar[2] === '/publish') return json(await areq.publishRequest(admin.userId, ar[1]))
+    if (ar && method === 'POST' && ar[2] === '/close') return json(await areq.closeRequest(admin.userId, ar[1]))
     if (method === 'GET' && path === '/admin/boost') return json(await boost.adminBoost())
     if (method === 'GET' && path === '/admin/feed') return json(await feed.adminFeed())
     const fac = path.match(/^\/admin\/feed\/(\d{1,15})\/comments$/)

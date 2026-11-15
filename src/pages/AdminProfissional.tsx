@@ -11,12 +11,15 @@ import StatusBadge from '../admin/StatusBadge'
 import type { Detail, Status } from '../admin/types'
 import { Thread } from './area/Mensagens'
 import WelcomeBox from '../admin/WelcomeBox'
+import ContactBox from '../admin/ContactBox'
+import Checklist from '../admin/Checklist'
 import { SITE } from '../config/site'
 import type { Msg } from '../area/types'
 import { api, ApiError } from '../lib/api'
 
-type Action = 'approve' | 'request_changes' | 'reject' | 'suspend' | 'reinstate'
+type Action = 'approve' | 'approve_verify' | 'request_changes' | 'reject' | 'suspend' | 'reinstate'
 const ACTIONS: Record<Action, { label: string; needsNotes: boolean; hint: string }> = {
+  approve_verify: { label: 'Aprovar e verificar celular', needsNotes: false, hint: 'Aprova o cadastro e marca o celular como verificado (use depois de confirmar o número).' },
   approve: { label: 'Aprovar', needsNotes: false, hint: 'O profissional passa a poder aparecer ao público.' },
   request_changes: { label: 'Pedir ajustes', needsNotes: true, hint: 'O profissional poderá editar e reenviar. Explique o que ajustar.' },
   reject: { label: 'Rejeitar', needsNotes: true, hint: 'O cadastro fica rejeitado e travado. Explique o motivo.' },
@@ -56,6 +59,10 @@ function Page() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
+  // Próximo cadastro em análise (para seguir a fila sem voltar à lista)
+  const [nextId, setNextId] = useState<string | null>(null)
+  const [rk, setRk] = useState(0)
+  const findNext = async () => { try { const r = await api.get<{ items: { id: string }[] }>('/admin/professionals?status=pending_review'); setNextId(r.items.find((i) => i.id !== id)?.id ?? null) } catch { setNextId(null) } }
   const load = useCallback(async () => {
     try { setD(await api.get<Detail>(`/admin/professionals/${id}`)) } catch (e) { setErr(e instanceof ApiError ? e.message : 'Não foi possível carregar.') }
   }, [id])
@@ -68,7 +75,9 @@ function Page() {
   if (err && !d) return <Shell><Alert tone="error">{err}</Alert></Shell>
   if (!d) return <Spinner fullPage />
 
-  const allowed = FOR_STATUS[d.reviewStatus] ?? []
+  const base = FOR_STATUS[d.reviewStatus] ?? []
+  // Cadastro em análise com celular ainda não verificado: oferece aprovar e verificar num único gesto.
+  const allowed: Action[] = d.reviewStatus === 'pending_review' && !d.phoneVerified ? ['approve_verify', ...base] : base
   const a = action ? ACTIONS[action] : null
   const notesOk = !a?.needsNotes || notes.trim().length >= 5
 
@@ -79,6 +88,10 @@ function Page() {
       {msg && <div className="mt-3"><Alert tone="success">{msg}</Alert></div>}
       {err && <div className="mt-3"><Alert tone="error">{err}</Alert></div>}
       {d.reviewNotes && <p className="mt-3 rounded-2xl bg-white p-4 text-[15px]"><strong>Última observação:</strong> {d.reviewNotes}</p>}
+
+      <Checklist d={d} />
+
+      {msg && nextId && <Link to={`/admin/profissionais/${nextId}`} onClick={() => setMsg(null)} data-testid="next-pending" className="mt-3 flex min-h-13 items-center justify-center rounded-2xl bg-graphite px-5 font-semibold text-white">Próximo cadastro em análise →</Link>}
 
       <Block title="Perfil">
         <div className="flex items-start gap-4">
@@ -106,14 +119,18 @@ function Page() {
           send={async (body) => { await api.post(`/admin/professionals/${d.id}/welcome`, { body }); await load(); return 'Boas-vindas enviadas.' }} />
       </Block>
 
-      <Block title={`Mensagens${d.unreadMessages ? ` (${d.unreadMessages} não lida(s))` : ''}`}>
-        <Thread mine="admin"
+      <Block title="Contato (app e WhatsApp)">
+        <ContactBox id={d.id} fullName={d.fullName} whatsappPhone={d.whatsappPhone} lastWhatsApp={d.lastWhatsApp} onSent={() => { setRk((n) => n + 1); void load() }} defaultTemplate={d.phoneVerified ? 'welcome' : 'verify'} />
+      </Block>
+
+      <Block title={`Conversa no app${d.unreadMessages ? ` (${d.unreadMessages} não lida(s))` : ''}`}>
+        <Thread mine="admin" hideComposer reloadKey={rk}
           load={() => api.get<{ messages: Msg[] }>(`/admin/professionals/${d.id}/messages`).then((r) => r.messages)}
           send={(body) => api.post<{ messages: Msg[] }>(`/admin/professionals/${d.id}/messages`, { body }).then((r) => r.messages)} />
       </Block>
 
       <Block title="Celular">
-        <p className="flex items-center gap-2 text-[16px]">{d.phoneVerified ? <><BadgeCheck size={20} aria-hidden="true" /> Verificado pela equipe</> : <><ShieldAlert size={20} aria-hidden="true" /> Ainda não verificado</>}</p>
+        <p className="flex items-center gap-2 text-[16px]">{d.phoneVerified ? <><BadgeCheck size={20} aria-hidden="true" /> Verificado pela equipe{d.phoneVerifiedAt ? ` em ${fmt(d.phoneVerifiedAt)}` : ''}</> : <><ShieldAlert size={20} aria-hidden="true" /> Ainda não verificado</>}</p>
         <div className="mt-3"><SubmitButton type="button" variant="ghost" className="border border-line" loading={busy} onClick={() => run(() => api.post(`/admin/professionals/${d.id}/phone`, { verified: !d.phoneVerified }), d.phoneVerified ? 'Verificação removida.' : 'Celular marcado como verificado.')}>
           {d.phoneVerified ? 'Remover verificação' : 'Marcar celular como verificado'}</SubmitButton></div>
         <p className="mt-2 text-[13px] text-muted">Conta criada em {fmt(d.createdAt)}{d.submittedAt ? ` · enviado em ${fmt(d.submittedAt)}` : ' · cadastro profissional ainda não enviado'}</p>
@@ -183,7 +200,7 @@ function Page() {
                 className="mt-2 block w-full rounded-2xl border border-line bg-white p-3 text-[16px] focus:outline-2 focus:outline-offset-2 focus:outline-graphite" />
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <SubmitButton type="button" variant="ghost" className="border border-line" onClick={() => { setAction(null); setNotes('') }}>Cancelar</SubmitButton>
-                <SubmitButton type="button" loading={busy} disabled={!notesOk} onClick={() => run(() => api.post(`/admin/professionals/${d.id}/decision`, { action, notes }), `${a!.label}: feito.`)}>Confirmar</SubmitButton>
+                <SubmitButton type="button" loading={busy} disabled={!notesOk} onClick={() => run(async () => { await api.post(`/admin/professionals/${d.id}/decision`, { action: action === 'approve_verify' ? 'approve' : action, notes, ...(action === 'approve_verify' ? { verifyPhone: true } : {}) }); if (action === 'approve' || action === 'approve_verify' || action === 'reject' || action === 'request_changes') void findNext() }, `${a!.label}: feito.`)}>Confirmar</SubmitButton>
               </div>
             </div>
           )}

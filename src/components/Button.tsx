@@ -15,8 +15,8 @@ type Props = {
 }
 
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-2xl font-semibold text-base leading-none ' +
-  'whitespace-nowrap select-none transition duration-200 ease-out active:scale-[0.97] ' +
+  'inline-flex items-center justify-center gap-2 rounded-2xl font-semibold text-base leading-tight ' +
+  'text-balance select-none transition duration-200 ease-out active:scale-[0.97] ' +
   'focus-visible:outline-2 focus-visible:outline-offset-2'
 
 const variants = {
@@ -27,8 +27,8 @@ const variants = {
 }
 
 const sizes = {
-  md: 'min-h-13 px-6', // 52px
-  sm: 'min-h-11 px-4', // 44px — apenas no cabeçalho
+  md: 'min-h-13 px-6 py-3 max-w-full', // 52px; o rótulo pode quebrar linha
+  sm: 'min-h-11 px-4 whitespace-nowrap', // 44px — apenas no cabeçalho
 }
 
 export default function Button({
@@ -48,7 +48,7 @@ export default function Button({
   const content = (
     <>
       {children}
-      {arrow && <ArrowRight size={20} strokeWidth={2.25} aria-hidden="true" />}
+      {arrow && <ArrowRight size={20} strokeWidth={2.25} className="shrink-0" aria-hidden="true" />}
     </>
   )
 

@@ -13,6 +13,7 @@ import Admin from './pages/Admin'
 import AdminDestaque from './pages/AdminDestaque'
 import Destaque from './pages/area/Destaque'
 import AdminMural from './pages/AdminMural'
+import { AdminPedidoDetalhe, AdminPedidoForm, AdminPedidos } from './pages/AdminPedidos'
 import { AdminComunicados, AdminMensagens } from './pages/AdminComunicacao'
 import Profissional from './pages/Profissional'
 import AdminProfissional from './pages/AdminProfissional'
@@ -61,6 +62,10 @@ export default function App() {
         <Route path="/profissional" element={<RequireAuth><Profissional /></RequireAuth>} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/destaque" element={<AdminDestaque />} />
+        <Route path="/admin/pedidos" element={<AdminPedidos />} />
+        <Route path="/admin/pedidos/novo" element={<AdminPedidoForm />} />
+        <Route path="/admin/pedidos/:id/editar" element={<AdminPedidoForm />} />
+        <Route path="/admin/pedidos/:id" element={<AdminPedidoDetalhe />} />
         <Route path="/admin/mural" element={<AdminMural />} />
         <Route path="/admin/mensagens" element={<AdminMensagens />} />
         <Route path="/admin/comunicados" element={<AdminComunicados />} />

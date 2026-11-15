@@ -4,10 +4,11 @@ export const STATUS_LABEL: Record<Status, string> = {
 }
 export type Stats = { byStatus: Record<Status, number>; unverifiedPhones: number; unreadMessages: number }
 export type Item = {
-  id: string; name: string | null; unread: number; phone: string; phoneVerified: boolean; createdAt: string; accountStatus: string; reviewStatus: Status; submittedAt: string | null
+  id: string; name: string | null; unread: number; whatsapp: string; phone: string; phoneVerified: boolean; createdAt: string; accountStatus: string; reviewStatus: Status; submittedAt: string | null
   professions: string[]; regions: string[]; bestScore: number | null; flagged: number
 }
 export type Detail = {
+  whatsappPhone: string; lastWhatsApp: string | null; phoneVerifiedAt: string | null
   fullName: string | null; bio: string | null; services: string | null; extraInfo: string | null; hasPhoto: boolean; unreadMessages: number; welcomeSent: boolean
   profileEvents: { kind: string; details: string | null; at: string }[]
   id: string; phone: string; phoneVerified: boolean; accountStatus: string; createdAt: string; reviewStatus: Status; submittedAt: string | null; reviewNotes: string | null

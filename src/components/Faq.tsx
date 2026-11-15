@@ -3,7 +3,9 @@ import { SITE } from '../config/site'
 
 const FAQ = [
   ['O cadastro é gratuito?', 'Sim. O pré-cadastro de profissionais é gratuito e não pede e-mail: só celular e senha.'],
-  ['Quando começam os pedidos de orçamento?', `A previsão é ${SITE.requestsOpenLabel}. Até lá, complete seu perfil e acompanhe os comunicados na sua área.`],
+  ['Quando começam os pedidos de orçamento?', `A previsão é ${SITE.requestsOpenLabel}, para profissionais aprovados. Até lá, complete seu perfil e acompanhe os comunicados na sua área.`],
+  ['O cadastro garante clientes ou renda?', 'Não. O cadastro não garante oportunidades, contratação nem rendimento. Ele prepara seu perfil para participar quando os pedidos começarem, depois de aprovado.'],
+  ['Vai ter cobrança?', 'O cadastro é gratuito. Se houver condições comerciais no futuro, elas serão informadas antes de qualquer cobrança.'],
   ['Preciso aguardar aprovação?', 'Sim. Nossa equipe analisa cada cadastro e nenhum perfil aparece ao público sem aprovação.'],
   ['Posso escolher mais de uma profissão?', 'Até 2 profissões e 2 regiões de atendimento.'],
   ['Preciso baixar um aplicativo?', 'Não. Você usa pelo navegador e, se quiser, instala na tela inicial do celular.'],

@@ -2,14 +2,24 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+    <!-- Microsoft Clarity (análise de usabilidade): carrega já no início, em todas as páginas, SEM depender do banner de cookies.
+         Não roda em localhost, homologação ("-homolog") nem deploys de teste ("--"), para não misturar dados de teste no projeto real.
+         Campos de telefone e senha e as áreas privadas (admin, mensagens, perfil) são mascarados com data-clarity-mask. -->
+    <script type="text/javascript">
+      (function () {
+        var h = location.hostname;
+        if (h === "localhost" || h === "127.0.0.1" || h.indexOf("-homolog") > -1 || h.indexOf("--") > -1) return;
+        (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","zdfavg1qjx");
+      })();
+    </script>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Mapa do Mapa — Receba pedidos de orçamento no celular</title>
+    <title>Mapa do Mapa — Seu trabalho merece mais oportunidades</title>
     <meta
       name="description"
-      content="Cadastre-se gratuitamente e prepare-se para receber oportunidades de serviços na sua região. Pedidos de orçamento a partir de %REQUESTS_OPEN_LABEL% em São Paulo."
+      content="Cadastre-se gratuitamente no Mapa do Mapa, prepare seu perfil profissional e faça parte da fase de pré-lançamento em São Paulo. Pedidos reais previstos a partir de %REQUESTS_OPEN_LABEL%."
     />
     <meta name="theme-color" content="#141715" />
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
@@ -28,7 +38,7 @@
     <meta property="og:title" content="Mapa do Mapa — Pré-lançamento em São Paulo" />
     <meta
       property="og:description"
-      content="Receba pedidos de orçamento direto no seu celular. Cadastre-se gratuitamente."
+      content="Cadastre-se gratuitamente e prepare seu perfil profissional para o lançamento."
     />
   </head>
   <body>

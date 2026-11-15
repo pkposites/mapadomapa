@@ -11,7 +11,7 @@ export const SITE = {
   requestsOpenDate: REQUESTS_OPEN_AT, // definido em shared/launch.ts (fonte única)
   requestsOpenLabel: REQUESTS_OPEN_LABEL,
   signupPath: '/cadastro',
-  ctaLabel: 'Quero me cadastrar',
+  ctaLabel: 'Quero me cadastrar gratuitamente',
   instagramUrl: 'https://www.instagram.com/mapadomapa/',
   instagramHandle: '@mapadomapa',
   privacyPath: '/privacidade',

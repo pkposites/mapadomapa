@@ -42,6 +42,7 @@ export async function home(userId: string) {
   if (status === 'needs_changes') pendencies.push({ id: 'changes', text: 'A equipe pediu ajustes no seu cadastro. Leia a orientação e reenvie.', to: '/profissional', required: true })
   if (!hasPhoto) pendencies.push({ id: 'photo', text: 'Adicione uma foto de perfil.', to: '/area/perfil', required: false })
   if (!p.bio) pendencies.push({ id: 'bio', text: 'Escreva uma apresentação profissional.', to: '/area/perfil', required: false })
+  if (!p.services) pendencies.push({ id: 'services', text: 'Descreva os serviços que você realiza.', to: '/area/perfil', required: false })
 
   const announcements = await query<Row>(
     `SELECT a.id, a.title, a.body, a.created_at, (r.user_id IS NOT NULL) AS read
@@ -55,6 +56,8 @@ export async function home(userId: string) {
     pendencies, unreadMessages, unreadAnnouncements,
     announcements: announcements.map((a) => ({ id: String(a.id), title: a.title as string, body: a.body as string, at: a.created_at, read: a.read as boolean })),
     hasPhoto,
+    // "Perfil preparado": nome, apresentação, serviços e foto preenchidos (a jornada mostra só o que é real)
+    profilePrepared: Boolean(p.full_name && p.bio && p.services && hasPhoto), submitted: status !== 'not_submitted',
   }
 }
 
@@ -216,4 +219,22 @@ export async function pushUnsubscribe(userId: string, body: Record<string, unkno
   if (typeof body.endpoint === 'string') await query('DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2', [userId, body.endpoint])
   else await query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId])
   return pushStatus(userId)
+}
+
+/** Dados leves do cabeçalho/barra do app: não lidas, nome, foto e o pedido mais novo disponível para este profissional. */
+export async function shellInfo(userId: string) {
+  const unread = await unreadCount(userId)
+  const [{ n: announcements }] = await query<Row>(
+    `SELECT count(*)::int n FROM announcements a WHERE a.published AND NOT EXISTS (SELECT 1 FROM announcement_reads r WHERE r.announcement_id = a.id AND r.user_id = $1)`, [userId])
+  const p = (await query<Row>('SELECT full_name, review_status FROM professional_profiles WHERE user_id = $1', [userId]))[0]
+  const photo = (await query<Row>('SELECT extract(epoch from updated_at)::bigint v FROM profile_photos WHERE user_id = $1', [userId]))[0]
+  let newestRequestId: number | null = null
+  if (p?.review_status === 'approved') {
+    const r = (await query<Row>(
+      `SELECT max(r.id)::bigint AS id FROM service_requests r WHERE r.status = 'published'
+         AND EXISTS (SELECT 1 FROM profile_professions pp WHERE pp.user_id = $1 AND pp.profession_id = r.profession_id)
+         AND EXISTS (SELECT 1 FROM professional_regions pr WHERE pr.user_id = $1 AND pr.region_id = r.region_id)`, [userId]))[0]
+    newestRequestId = r?.id ? Number(r.id) : null
+  }
+  return { unread, announcements: announcements as number, name: (p?.full_name ?? null) as string | null, photoVersion: photo ? String(photo.v) : null, newestRequestId }
 }

@@ -89,3 +89,28 @@ describe('Roteamento: /api nunca pode cair na página HTML', () => {
     expect(readdirSync('./netlify/functions')).toContain('api.mts')
   })
 })
+
+describe('Microsoft Clarity', () => {
+  const html = readFileSync('./index.html', 'utf8')
+  it('carrega no <head>, cedo, em todas as páginas, sem depender do consentimento de cookies', () => {
+    const head = html.slice(html.indexOf('<head>'), html.indexOf('</head>'))
+    expect(head).toContain('https://www.clarity.ms/tag/')
+    expect(head).toContain('"zdfavg1qjx"')
+    expect(head.indexOf('clarity.ms')).toBeLessThan(head.indexOf('<title>')) // o mais alto possível
+    const snippet = head.slice(head.indexOf('<script type="text/javascript">'), head.indexOf('</script>'))
+    expect(snippet).not.toMatch(/consent|mdm_consent_v1|localStorage/i) // não amarrado ao consentimento
+    for (const f of ['src/lib/consent.ts', 'src/components/ConsentBanner.tsx', 'src/lib/meta.ts']) expect(readFileSync(f, 'utf8').replace(/Microsoft Clarity/g, '')).not.toMatch(/clarity|window\.clarity/i) // Pixel da Meta segue como está
+  })
+  it('não roda em localhost, homologação nem deploys de teste', () => {
+    expect(html).toMatch(/localhost[\s\S]{0,200}-homolog[\s\S]{0,60}"--"/)
+  })
+  it('telefone, senha e áreas privadas são mascarados', () => {
+    expect(readFileSync('src/components/ui/Field.tsx', 'utf8').match(/data-clarity-mask="true"/g)?.length).toBe(2)
+    expect(readFileSync('src/admin/AdminGate.tsx', 'utf8')).toContain('data-clarity-mask="true"')
+    expect(readFileSync('src/area/Shell.tsx', 'utf8')).toContain("data-clarity-mask")
+  })
+  it('sem CSP no projeto (nada a liberar); se existir, tem que permitir clarity.ms', () => {
+    const toml = readFileSync('netlify.toml', 'utf8')
+    if (/content-security-policy/i.test(toml)) expect(toml).toMatch(/clarity\.ms/)
+  })
+})

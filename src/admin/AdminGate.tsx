@@ -36,5 +36,6 @@ export default function AdminGate({ children }: { children: ReactNode }) {
         <SubmitButton onClick={async () => { await logout().catch(() => undefined); navigate('/entrar', { state: { from: '/admin' } }) }}>Entrar de novo</SubmitButton></div>
     </AuthShell>)
   if (state === 'error') return <AuthShell eyebrow="Administração" title="Não foi possível carregar"><Alert tone="error">Algo deu errado. Tente de novo em instantes.</Alert></AuthShell>
-  return <>{children}</>
+  // Área administrativa: dados pessoais de profissionais e clientes. O Clarity grava a tela, mas sem o conteúdo.
+  return <div data-clarity-mask="true">{children}</div>
 }

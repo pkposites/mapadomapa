@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { setConsent, useConsent } from '../lib/consent'
 import { metaConfigured, syncPixel } from '../lib/meta'
 import { SITE } from '../config/site'
@@ -11,6 +11,7 @@ import { SITE } from '../config/site'
  */
 export default function ConsentBanner() {
   const { state, panelOpen, signal } = useConsent()
+  const inApp = useLocation().pathname.startsWith('/area') // a barra de abas fica embaixo: o banner sobe acima dela
   useEffect(() => { syncPixel() }, [state])
 
   if (!metaConfigured || signal || (state !== 'unset' && !panelOpen)) return null
@@ -21,16 +22,16 @@ export default function ConsentBanner() {
       aria-modal="false"
       aria-labelledby="consent-title"
       className="fixed inset-x-3 bottom-3 z-[60] rounded-2xl bg-graphite p-3.5 text-white md:p-5 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.5)] ring-1 ring-white/10 md:inset-x-auto md:right-5 md:bottom-5 md:w-[26rem]"
-      style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+      style={{ marginBottom: inApp ? 'calc(4rem + env(safe-area-inset-bottom))' : 'env(safe-area-inset-bottom)' }}
     >
       <p id="consent-title" className="hidden text-[17px] font-semibold leading-snug md:block">Sua privacidade</p>
       {/* Celular: texto curto, para o banner ficar baixo e não cobrir os botões da página */}
       <p className="text-[13px] leading-snug text-on-dark md:hidden">
-        <strong className="font-semibold text-white">Sua privacidade.</strong> Usamos cookies da Meta para medir anúncios (opcional).{' '}
+        <strong className="font-semibold text-white">Sua privacidade.</strong> Cookies da Meta para medir anúncios (opcional). Também usamos o Microsoft Clarity para análise de uso, independente desta escolha.{' '}
         <Link to={SITE.privacyPath} target="_blank" className="font-semibold text-white underline decoration-lime decoration-2 underline-offset-4">Saiba mais</Link>
       </p>
       <p className="mt-2 hidden text-[15px] leading-relaxed text-on-dark md:block">
-        Podemos usar cookies de medição da Meta para entender se nossos anúncios funcionam. Isso é opcional e você decide.{' '}
+        Podemos usar cookies de medição da Meta para entender se nossos anúncios funcionam. Isso é opcional e você decide. Também usamos o Microsoft Clarity para analisar o uso do site, independentemente desta escolha.{' '}
         <Link to={SITE.privacyPath} target="_blank" className="font-semibold text-white underline decoration-lime decoration-2 underline-offset-4">
           Saiba mais
         </Link>

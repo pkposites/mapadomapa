@@ -187,3 +187,31 @@ describe('Nenhum profissional aparece publicamente sem aprovação humana', () =
     expect(cols.sort()).toEqual(['experience_years', 'professions', 'regions'])
   })
 })
+
+describe('Aprovação e verificação do celular (fluxo do admin)', () => {
+  it('filtra "celular não verificado", entrega o número p/ WhatsApp só ao admin e registra o clique', async () => {
+    const admin = await mkAdmin(); const pro = await mkPro(); const other = await mkPro(['guincho'])
+    const list = (await api('GET', '/admin/professionals?phone=unverified', { cookie: admin.cookie })).body.items
+    expect(list.map((i: any) => i.id).sort()).toEqual([pro.id, other.id].sort())
+    expect(list[0].whatsapp).toMatch(/^55\d{11}$/)
+    await api('POST', `/admin/professionals/${pro.id}/phone`, { cookie: admin.cookie, body: { verified: true } })
+    expect((await api('GET', '/admin/professionals?phone=unverified', { cookie: admin.cookie })).body.items.map((i: any) => i.id)).toEqual([other.id])
+    const d0 = (await api('GET', `/admin/professionals/${other.id}`, { cookie: admin.cookie })).body
+    expect(d0.whatsappPhone).toMatch(/^55\d{11}$/); expect(d0.lastWhatsApp).toBeNull()
+    expect((await api('POST', `/admin/professionals/${other.id}/whatsapp-log`, { cookie: pro.cookie })).status).toBe(403)
+    expect((await api('POST', `/admin/professionals/${other.id}/whatsapp-log`)).status).toBe(401)
+    expect((await api('POST', `/admin/professionals/${other.id}/whatsapp-log`, { cookie: admin.cookie })).status).toBe(200)
+    expect((await api('GET', `/admin/professionals/${other.id}`, { cookie: admin.cookie })).body.lastWhatsApp).not.toBeNull()
+    expect((await api('GET', `/pro/me`, { cookie: other.cookie })).body.whatsappPhone).toBeUndefined() // o profissional nunca recebe isso
+  })
+  it('"Aprovar e verificar celular": um gesto aprova, verifica e registra os dois no histórico; sem a opção, não verifica', async () => {
+    const admin = await mkAdmin(); const a = await mkPro(); const b = await mkPro(['guincho'])
+    expect((await api('POST', `/admin/professionals/${a.id}/decision`, { cookie: admin.cookie, body: { action: 'approve', verifyPhone: true } })).status).toBe(200)
+    expect(await status(a.id)).toBe('approved')
+    expect((await query<any>('SELECT verified_by FROM phones WHERE user_id = $1', [a.id]))[0].verified_by).toBe(admin.id)
+    expect((await query<any>("SELECT action FROM review_events WHERE user_id = $1 ORDER BY id", [a.id])).map((r) => r.action)).toEqual(['approve', 'verify_phone'])
+    await api('POST', `/admin/professionals/${b.id}/decision`, { cookie: admin.cookie, body: { action: 'approve' } })
+    expect((await query<any>('SELECT verified_at FROM phones WHERE user_id = $1', [b.id]))[0].verified_at).toBeNull()
+    expect((await api('POST', `/admin/professionals/${b.id}/decision`, { cookie: b.cookie, body: { action: 'approve', verifyPhone: true } })).status).toBe(403) // profissional não decide
+  })
+})
