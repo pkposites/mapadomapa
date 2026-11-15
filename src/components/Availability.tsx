@@ -10,8 +10,8 @@ export function AvailabilityCards({ dark = false }: { dark?: boolean }) {
   return (
     <div className="grid gap-3 md:grid-cols-3 md:gap-4" data-testid="availability">
       <article className={`rounded-3xl p-6 ${card} ring-2 ring-lime`} data-testid="av-now">
-        <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#2b8a00]"><CheckCircle2 size={18} aria-hidden="true" /> {now.title}</p>
-        <ul className="mt-4 space-y-2.5">{now.items.map((i) => <li key={i} className="flex gap-2.5 text-[16px] leading-snug"><CheckCircle2 size={18} className="mt-0.5 shrink-0 text-[#2b8a00]" aria-hidden="true" />{i}</li>)}</ul>
+        <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-ok"><CheckCircle2 size={18} aria-hidden="true" /> {now.title}</p>
+        <ul className="mt-4 space-y-2.5">{now.items.map((i) => <li key={i} className="flex gap-2.5 text-[16px] leading-snug"><CheckCircle2 size={18} className="mt-0.5 shrink-0 text-ok" aria-hidden="true" />{i}</li>)}</ul>
       </article>
       <article className={`rounded-3xl p-6 ${card}`} data-testid="av-soon">
         <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#8a5a00]"><CalendarClock size={18} aria-hidden="true" /> {soon.title}</p>

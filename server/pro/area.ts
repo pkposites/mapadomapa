@@ -220,3 +220,21 @@ export async function pushUnsubscribe(userId: string, body: Record<string, unkno
   else await query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId])
   return pushStatus(userId)
 }
+
+/** Dados leves do cabeçalho/barra do app: não lidas, nome, foto e o pedido mais novo disponível para este profissional. */
+export async function shellInfo(userId: string) {
+  const unread = await unreadCount(userId)
+  const [{ n: announcements }] = await query<Row>(
+    `SELECT count(*)::int n FROM announcements a WHERE a.published AND NOT EXISTS (SELECT 1 FROM announcement_reads r WHERE r.announcement_id = a.id AND r.user_id = $1)`, [userId])
+  const p = (await query<Row>('SELECT full_name, review_status FROM professional_profiles WHERE user_id = $1', [userId]))[0]
+  const photo = (await query<Row>('SELECT extract(epoch from updated_at)::bigint v FROM profile_photos WHERE user_id = $1', [userId]))[0]
+  let newestRequestId: number | null = null
+  if (p?.review_status === 'approved') {
+    const r = (await query<Row>(
+      `SELECT max(r.id)::bigint AS id FROM service_requests r WHERE r.status = 'published'
+         AND EXISTS (SELECT 1 FROM profile_professions pp WHERE pp.user_id = $1 AND pp.profession_id = r.profession_id)
+         AND EXISTS (SELECT 1 FROM professional_regions pr WHERE pr.user_id = $1 AND pr.region_id = r.region_id)`, [userId]))[0]
+    newestRequestId = r?.id ? Number(r.id) : null
+  }
+  return { unread, announcements: announcements as number, name: (p?.full_name ?? null) as string | null, photoVersion: photo ? String(photo.v) : null, newestRequestId }
+}

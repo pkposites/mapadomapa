@@ -3,7 +3,8 @@ import { CalendarDays, CheckCircle2, Inbox, MapPin } from 'lucide-react'
 import AreaShell from '../../area/Shell'
 import BoostCard from '../../area/BoostCard'
 import Alert from '../../components/ui/Alert'
-import Spinner from '../../components/ui/Spinner'
+import { SkeletonList } from '../../components/ui/Skeleton'
+import { buzz, toast } from '../../lib/toast'
 import { SITE } from '../../config/site'
 import { api, ApiError } from '../../lib/api'
 
@@ -22,6 +23,7 @@ export default function Pedidos() {
     try {
       await api.post(`/pro/requests/${o.id}/interest`)
       setData((d) => d && { ...d, items: d.items.map((x) => (x.id === o.id ? { ...x, interested: true } : x)) })
+      buzz(); toast('Interesse enviado')
       setMsg({ tone: 'success', text: 'Interesse enviado! A equipe entrará em contato se o pedido seguir com você.' })
     } catch (e) { setMsg({ tone: 'error', text: e instanceof ApiError ? e.message : 'Não foi possível enviar agora.' }) } finally { setBusy(null) }
   }
@@ -29,8 +31,8 @@ export default function Pedidos() {
 
   return (
     <AreaShell>
-      <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Meus Pedidos</h1>
-      {!data && <div className="mt-10 flex justify-center"><Spinner /></div>}
+      <h1 className="sr-only">Meus Pedidos</h1>
+      {!data && <div className="mt-2"><SkeletonList rows={2} tall /></div>}
 
       {data && items.length > 0 && (
         <section className="mt-4" aria-label="Oportunidades" data-testid="opportunities">
@@ -49,7 +51,7 @@ export default function Pedidos() {
                 {o.periodNote && <p className="mt-2 text-[14px]"><strong>Período:</strong> {o.periodNote}</p>}
                 <p className="mt-2 text-[12px] text-muted">Publicado em {new Date(o.publishedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                 {o.interested
-                  ? <p className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-ice font-semibold" data-testid="interested"><CheckCircle2 size={18} className="text-[#2b8a00]" aria-hidden="true" /> Interesse enviado</p>
+                  ? <p className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-ice font-semibold" data-testid="interested"><CheckCircle2 size={18} className="text-ok" aria-hidden="true" /> Interesse enviado</p>
                   : <button type="button" disabled={busy === o.id} onClick={() => interest(o)} data-testid="interest" className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-lime px-6 font-semibold text-graphite disabled:opacity-60">Tenho interesse</button>}
               </li>
             ))}

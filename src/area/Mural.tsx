@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Flag, Heart, MessageCircle, PenSquare, Send, Trash2 } from 'lucide-react'
+import { Flag, Heart, MessageCircle, MoreHorizontal, PenSquare, Send, Trash2 } from 'lucide-react'
 import Alert from '../components/ui/Alert'
+import { SkeletonList } from '../components/ui/Skeleton'
+import { buzz, toast } from '../lib/toast'
 import Avatar, { StaffBadge } from './Avatar'
 import { api, ApiError } from '../lib/api'
 
@@ -39,7 +41,7 @@ export function LikeButton({ p, access, update, note }: { p: Post; access: Acces
   }
   return (
     <button type="button" aria-pressed={p.liked} aria-disabled={!access.canInteract} onClick={toggle} data-testid="like" className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[14px] font-semibold transition active:scale-95 ${p.liked ? 'text-[#c4261d]' : 'text-muted'} ${access.canInteract ? '' : 'opacity-60'}`}>
-      <Heart size={19} fill={p.liked ? 'currentColor' : 'none'} aria-hidden="true" /> {p.likes > 0 ? p.likes : ''}<span className="sr-only"> Curtir</span>
+      <Heart size={24} fill={p.liked ? 'currentColor' : 'none'} aria-hidden="true" /> {p.likes > 0 ? p.likes : ''}<span className="sr-only"> Curtir</span>
     </button>
   )
 }
@@ -105,13 +107,13 @@ function Composer({ access, onCreated }: { access: Access; onCreated: (f: Feed) 
   }
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} data-testid="new-post" className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-2xl bg-ice px-3 text-left text-[16px] text-muted">
+      <button type="button" onClick={() => setOpen(true)} data-testid="new-post" className="flex min-h-14 w-full items-center gap-3 rounded-2xl bg-white px-3 text-left text-[16px] text-muted">
         <Avatar name={access.myName ?? '?'} size={36} staff={access.isStaff} /> <span className="flex-1">Criar um post…</span><PenSquare size={18} aria-hidden="true" />
       </button>
     )
   }
   return (
-    <div className="mt-4 rounded-2xl border border-line p-4" data-testid="composer">
+    <div className="rounded-2xl bg-white p-4" data-testid="composer">
       <p className="text-[15px] font-semibold">Sobre o que é o seu post?</p>
       <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Tema do post">
         {access.topics.map((t) => <button key={t.id} type="button" aria-pressed={topic === t.id} onClick={() => pick(t.id)} className={`min-h-11 rounded-full border px-3.5 text-[14px] font-medium ${topic === t.id ? 'border-graphite bg-graphite text-white' : 'border-line bg-white'}`}>{t.label}</button>)}
@@ -130,7 +132,98 @@ function Composer({ access, onCreated }: { access: Access; onCreated: (f: Feed) 
   )
 }
 
-/** Mural dos profissionais: posts separados com tema e título. Só nome, profissão e texto; sem acesso a perfis. */
+type Story = { id: string; title: string; body: string; read: boolean }
+
+/** Menu "⋯" do post: denunciar (ou excluir, se for seu). */
+function PostMenu({ p, f, onDelete, note }: { p: Post; f: Feed; onDelete: () => void; note: (m: { tone: 'success' | 'error' | 'info'; text: string }) => void }) {
+  const [open, setOpen] = useState(false)
+  const item = 'flex min-h-11 w-full items-center gap-2 px-4 text-left text-[15px] font-medium'
+  return (
+    <div className="relative">
+      <button type="button" aria-label="Mais opções" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="grid size-11 place-items-center text-graphite"><MoreHorizontal size={24} aria-hidden="true" /></button>
+      {open && (
+        <>
+          <button type="button" aria-label="Fechar menu" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
+          <div role="menu" className="absolute right-2 top-10 z-20 w-48 overflow-hidden rounded-2xl border border-line bg-white py-1 shadow-lg">
+            {p.mine
+              ? <button role="menuitem" className={`${item} text-danger`} onClick={() => { setOpen(false); if (window.confirm('Excluir este post?')) void api.del(`/pro/feed/${p.id}`).then(onDelete).catch((e) => note({ tone: 'error', text: msgOf(e) })) }}><Trash2 size={18} aria-hidden="true" /> Excluir</button>
+              : <button role="menuitem" className={`${item} ${f.canInteract ? '' : 'opacity-60'}`} onClick={() => { setOpen(false); if (!f.canInteract) return; if (window.confirm('Denunciar este post para a equipe?')) void api.post(`/pro/feed/${p.id}/report`).then(() => { toast('Denúncia enviada'); note({ tone: 'success', text: 'Denúncia enviada. A equipe vai analisar.' }) }).catch((e) => note({ tone: 'error', text: msgOf(e) })) }}><Flag size={18} aria-hidden="true" /> Denunciar</button>}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Cartão de post, no estilo de rede social: cabeçalho, texto e ações. Toque duplo curte. */
+function PostCard({ p, f, update, remove, note, compact }: { p: Post; f: Feed; update: (n: Post) => void; remove: () => void; note: (m: { tone: 'success' | 'error' | 'info'; text: string }) => void; compact: boolean }) {
+  const [pop, setPop] = useState(0)
+  const last = useRef(0)
+  const like = async (force?: boolean) => {
+    if (!f.canInteract) return
+    const next = force ?? !p.liked
+    if (next === p.liked) return
+    update({ ...p, liked: next, likes: p.likes + (next ? 1 : -1) })
+    buzz()
+    try { const r = await api.put<{ likes: number; liked: boolean }>(`/pro/feed/${p.id}/like`, { liked: next }); update({ ...p, liked: r.liked, likes: r.likes }) } catch (e) { update(p); note({ tone: 'error', text: msgOf(e) }) }
+  }
+  const onTap = () => { const t = Date.now(); if (t - last.current < 350) { setPop((n) => n + 1); void like(true) } last.current = t }
+  return (
+    <article className="relative overflow-hidden rounded-2xl bg-white" data-testid="post">
+      <div className="flex items-center gap-3 pl-3 pt-3">
+        <Avatar name={p.name} staff={p.staff} size={40} />
+        <div className="min-w-0 flex-1"><Author p={p} /></div>
+        {!compact && <PostMenu p={p} f={f} onDelete={remove} note={note} />}
+      </div>
+      <div className="px-3 pb-1 pt-2" onClick={onTap} data-testid="post-body">
+        <Link to={`/area/mural/${p.id}`} data-testid="post-link" className="block">
+          <TopicPill topics={f.topics} id={p.topic} />
+          <p className="mt-1.5 text-heading font-bold leading-snug tracking-[-0.01em]">{postTitle(p)}</p>
+          {p.title && <p className="mt-1 line-clamp-3 whitespace-pre-line break-words text-small leading-snug text-muted">{p.body}</p>}
+        </Link>
+        {pop > 0 && <Heart key={pop} aria-hidden="true" fill="currentColor" size={84} className="pointer-events-none absolute left-1/2 top-1/2 -ml-[42px] -mt-[42px] animate-[heart-pop_.7s_ease-out_forwards] text-lime drop-shadow-lg" />}
+      </div>
+      <div className="flex items-center px-1 pb-2">
+        <LikeButton p={p} access={f} update={update} note={(t) => note({ tone: 'info', text: t })} />
+        <Link to={`/area/mural/${p.id}`} aria-label="Ver post e comentários" className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-small font-semibold text-muted"><MessageCircle size={24} aria-hidden="true" /> {p.comments > 0 ? p.comments : ''}</Link>
+      </div>
+    </article>
+  )
+}
+
+/** Faixa de "stories": comunicados da equipe (os profissionais não aparecem aqui). */
+function Stories() {
+  const [items, setItems] = useState<Story[] | null>(null)
+  const [open, setOpen] = useState<Story | null>(null)
+  useEffect(() => { api.get<{ items: Story[] }>('/pro/announcements').then((r) => setItems(r.items.slice(0, 8))).catch(() => setItems([])) }, [])
+  if (!items || items.length === 0) return null
+  return (
+    <>
+      <ul className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1" aria-label="Comunicados da equipe" data-testid="stories">
+        {items.map((s) => (
+          <li key={s.id} className="w-[72px] shrink-0 text-center">
+            <button type="button" onClick={() => { setOpen(s); if (!s.read) void api.post('/pro/announcements/read').then(() => setItems((cur) => cur && cur.map((x) => ({ ...x, read: true })))).catch(() => undefined) }} className="block w-full">
+              <span className={`mx-auto grid size-16 place-items-center rounded-full p-[3px] ${s.read ? 'bg-line' : 'bg-lime'}`}><span className="grid size-full place-items-center rounded-full border-2 border-ice bg-white"><img src="/icons/icon-192.png" alt="" width={36} height={36} className="size-9 rounded-full" /></span></span>
+              <span className="mt-1 block truncate text-tiny font-semibold">{s.title}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/50" role="dialog" aria-modal="true" aria-label={open.title} onClick={() => setOpen(null)}>
+          <div className="mx-auto w-full max-w-lg animate-[sheet-up_.22s_ease-out] rounded-t-3xl bg-white p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" />
+            <p className="text-heading font-bold">{open.title}</p>
+            <p className="mt-2 whitespace-pre-line text-body leading-snug text-muted">{open.body}</p>
+            <button type="button" onClick={() => setOpen(null)} className="mt-4 min-h-12 w-full rounded-2xl bg-graphite font-semibold text-white">Fechar</button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+/** Mural dos profissionais (estilo rede social): só nome, profissão e texto. Sem acesso a perfis. */
 export default function Mural({ compact = false }: { compact?: boolean }) {
   const [feed, setFeed] = useState<Feed | null>(null)
   const [filter, setFilter] = useState('')
@@ -140,57 +233,43 @@ export default function Mural({ compact = false }: { compact?: boolean }) {
     const mine = ++seq.current
     api.get<Feed>(`/pro/feed${filter ? `?topic=${filter}` : ''}`).then((f) => { if (mine === seq.current) setFeed(f) }).catch(() => { if (mine === seq.current) setFeed((cur) => cur) })
   }, [filter])
-  if (!feed) return null
+  if (!feed) return compact ? null : <SkeletonList rows={3} tall />
 
-  const items = compact ? feed.items.slice(0, 3) : feed.items
+  const items = compact ? feed.items.slice(0, 2) : feed.items
   const more = async () => { try { const r = await api.get<Feed>(`/pro/feed?before=${feed.items.at(-1)!.id}${filter ? `&topic=${filter}` : ''}`); setFeed({ ...feed, items: [...feed.items, ...r.items], hasMore: r.hasMore }) } catch (e) { setMsg({ tone: 'error', text: msgOf(e) }) } }
   const upd = (n: Post) => setFeed((cur) => cur && { ...cur, items: cur.items.map((x) => (x.id === n.id ? n : x)) })
 
   return (
-    <section className="rounded-3xl bg-white p-5" aria-label="Mural dos profissionais" data-testid="mural">
-      <div className="flex items-center justify-between">
-        <h2 className="text-[20px] font-bold tracking-tight">Mural dos profissionais</h2>
-        {compact && <Link to="/area/mural" className="text-[14px] font-semibold underline decoration-lime decoration-2 underline-offset-4">Ver tudo</Link>}
-      </div>
+    <section aria-label="Mural dos profissionais" data-testid="mural" className={compact ? '' : 'space-y-3'}>
+      {compact && (
+        <div className="mb-2 flex items-center justify-between"><h2 className="text-heading font-bold tracking-tight">Mural</h2><Link to="/area/mural" className="inline-flex min-h-11 items-center text-small font-semibold underline decoration-lime decoration-2 underline-offset-4">Ver tudo</Link></div>
+      )}
+      {!compact && <Stories />}
 
-      {feed.canPost
-        ? <Composer access={feed} onCreated={(f) => { setFeed(f); setFilter(''); setMsg({ tone: 'success', text: 'Post publicado!' }) }} />
-        : <p className="mt-3 rounded-2xl bg-ice p-3 text-[14px] leading-snug" data-testid="locked-note">
+      {!compact && (feed.canPost
+        ? <Composer access={feed} onCreated={(f) => { setFeed(f); setFilter(''); toast('Post publicado'); setMsg({ tone: 'success', text: 'Post publicado!' }) }} />
+        : <p className="rounded-2xl bg-white p-3 text-small leading-snug" data-testid="locked-note">
             {feed.needsName ? <>Para publicar, <Link to="/area/perfil" className="font-semibold underline">informe seu nome no perfil</Link>.</> : feed.lockedNote}
-          </p>}
-      {msg && <div className="mt-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
+          </p>)}
+      {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
 
       {!compact && (
-        <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label="Filtrar por tema">
-          {[{ id: '', label: 'Todos' }, ...feed.topics].map((t) => <button key={t.id} type="button" aria-pressed={filter === t.id} onClick={() => setFilter(t.id)} className={`min-h-11 shrink-0 rounded-full border px-3.5 text-[14px] font-medium ${filter === t.id ? 'border-graphite bg-graphite text-white' : 'border-line bg-white'}`}>{t.label}</button>)}
+        <div className="relative">
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 pr-12" role="group" aria-label="Filtrar por tema">
+            {[{ id: '', label: 'Todos' }, ...feed.topics].map((t) => <button key={t.id} type="button" aria-pressed={filter === t.id} onClick={() => setFilter(t.id)} className={`min-h-11 shrink-0 rounded-full border px-3.5 text-small font-medium ${filter === t.id ? 'border-graphite bg-graphite text-white' : 'border-line bg-white'}`}>{t.label}</button>)}
+          </div>
+          <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-[-16px] w-12 bg-gradient-to-l from-ice to-transparent" />
         </div>
       )}
 
-      <ul className="mt-2 divide-y divide-line" data-testid="posts">
-        {items.length === 0 && <li className="py-6 text-center text-[15px] text-muted">Nenhum post por aqui ainda. {feed.canPost ? 'Seja o primeiro a publicar!' : 'Volte em breve.'}</li>}
+      <div className="space-y-3" data-testid="posts">
+        {items.length === 0 && <p className="rounded-2xl bg-white py-6 text-center text-body text-muted">Nenhum post por aqui ainda. {feed.canPost ? 'Seja o primeiro a publicar!' : 'Volte em breve.'}</p>}
         {items.map((p) => (
-          <li key={p.id} className="py-4" data-testid="post">
-            <div className="flex items-start gap-3">
-              <Avatar name={p.name} staff={p.staff} />
-              <div className="min-w-0 flex-1"><Author p={p} /></div>
-              {!compact && (p.mine
-                ? <button type="button" aria-label="Excluir post" onClick={() => { if (window.confirm('Excluir este post?')) void api.del(`/pro/feed/${p.id}`).then(() => setFeed((c) => c && { ...c, items: c.items.filter((x) => x.id !== p.id) })).catch((e) => setMsg({ tone: 'error', text: msgOf(e) })) }} className="grid size-11 place-items-center text-muted"><Trash2 size={17} aria-hidden="true" /></button>
-                : <button type="button" aria-label="Denunciar post" aria-disabled={!feed.canInteract} onClick={() => { if (!feed.canInteract) return; if (window.confirm('Denunciar este post para a equipe?')) void api.post(`/pro/feed/${p.id}/report`).then(() => setMsg({ tone: 'success', text: 'Denúncia enviada. A equipe vai analisar.' })).catch((e) => setMsg({ tone: 'error', text: msgOf(e) })) }} className={`grid size-11 place-items-center text-muted ${feed.canInteract ? '' : 'opacity-60'}`}><Flag size={16} aria-hidden="true" /></button>)}
-            </div>
-            <Link to={`/area/mural/${p.id}`} className="mt-2 block" data-testid="post-link">
-              <TopicPill topics={feed.topics} id={p.topic} />
-              <p className="mt-1.5 text-[18px] font-bold leading-snug tracking-[-0.01em]">{postTitle(p)}</p>
-              {p.title && <p className="mt-1 line-clamp-3 whitespace-pre-line break-words text-[15px] leading-snug text-muted">{p.body}</p>}
-            </Link>
-            <div className="mt-2 flex items-center gap-1">
-              <LikeButton p={p} access={feed} update={upd} note={(t) => setMsg({ tone: 'info', text: t })} />
-              <Link to={`/area/mural/${p.id}`} aria-label="Ver post e comentários" className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[14px] font-semibold text-muted"><MessageCircle size={19} aria-hidden="true" /> {p.comments > 0 ? p.comments : ''}</Link>
-            </div>
-          </li>
+          <PostCard key={p.id} p={p} f={feed} note={setMsg} compact={compact} update={upd} remove={() => setFeed((c) => c && { ...c, items: c.items.filter((x) => x.id !== p.id) })} />
         ))}
-      </ul>
-      {!compact && feed.hasMore && <button type="button" onClick={more} className="min-h-11 w-full rounded-2xl border border-line text-[15px] font-semibold">Ver posts anteriores</button>}
-      {compact && (feed.hasMore || feed.items.length > 3) && <Link to="/area/mural" className="mt-1 flex min-h-11 items-center justify-center rounded-2xl border border-line text-[15px] font-semibold">Ver mais no mural</Link>}
+      </div>
+      {!compact && feed.hasMore && <button type="button" onClick={more} className="min-h-11 w-full rounded-2xl border border-line bg-white text-body font-semibold">Ver posts anteriores</button>}
+      {compact && (feed.hasMore || feed.items.length > 2) && <Link to="/area/mural" className="mt-3 flex min-h-11 items-center justify-center rounded-2xl border border-line bg-white text-body font-semibold">Ver mais no mural</Link>}
     </section>
   )
 }

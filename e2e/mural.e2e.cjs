@@ -61,7 +61,7 @@ async function signup(browser, phone, pass) {
   check('filtro por tema funciona', (await page.locator('[data-testid=post]').count()) >= 1 && /Novidade: bem-vindos/.test(await page.locator('[data-testid=posts]').innerText()))
   await page.getByRole('group', { name: 'Filtrar por tema' }).getByRole('button', { name: 'Dúvida', exact: true }).click(); await page.waitForTimeout(500)
   await page.waitForSelector('text=Nenhum post por aqui', { timeout: 10000 }).catch(() => {})
-  check('tema sem posts mostra mensagem vazia', /Nenhum post/.test(await page.locator('[data-testid=posts]').innerText()))
+  check('tema sem posts mostra mensagem vazia', /Nenhum post/.test(await page.locator('[data-testid=posts]').innerText()), (await page.locator('[data-testid=posts]').innerText()).slice(0,200))
   await page.goto(B + '/area'); await page.waitForSelector('[data-testid=greeting]')
   check('Início mostra resumo do mural com título', /Novidade: bem-vindos ao mural/.test(await page.locator('[data-testid=mural]').innerText()))
   check('sem rolagem horizontal', (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0)

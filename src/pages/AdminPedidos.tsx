@@ -165,7 +165,7 @@ function DetailPage() {
           <ul className="mt-2 divide-y divide-line">{d.interested.map((p) => (
             <li key={p.id} className="py-3" data-testid="interested-row">
               <p className="text-[16px] font-semibold">{p.name ?? 'Sem nome'} <span className="text-[13px] font-normal text-muted">· {fmt(p.at)}</span></p>
-              <p className="text-[14px]">{p.phone ?? '—'} {p.phoneVerified ? <span className="text-[12px] text-[#2b8a00]">· verificado</span> : <span className="text-[12px] text-muted">· não verificado</span>}</p>
+              <p className="text-[14px]">{p.phone ?? '—'} {p.phoneVerified ? <span className="text-[12px] text-ok">· verificado</span> : <span className="text-[12px] text-muted">· não verificado</span>}</p>
               <p className="text-[13px] text-muted">{p.professions.join(' · ')} · {p.regions.join(' · ')}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {p.whatsapp && <a href={waUrl(p.whatsapp, personalize(`Olá, [nome]! Aqui é a equipe do Mapa do Mapa. Recebemos um pedido compatível com você: "${d.title}" (${d.neighborhood}, ${d.region}). Você tem disponibilidade para atender?`, p.name))} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25d366] px-4 text-[14px] font-semibold text-graphite"><MessageCircle size={16} aria-hidden="true" /> WhatsApp</a>}

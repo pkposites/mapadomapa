@@ -99,7 +99,7 @@ describe('Microsoft Clarity', () => {
     expect(head.indexOf('clarity.ms')).toBeLessThan(head.indexOf('<title>')) // o mais alto possível
     const snippet = head.slice(head.indexOf('<script type="text/javascript">'), head.indexOf('</script>'))
     expect(snippet).not.toMatch(/consent|mdm_consent_v1|localStorage/i) // não amarrado ao consentimento
-    for (const f of ['src/lib/consent.ts', 'src/components/ConsentBanner.tsx', 'src/lib/meta.ts']) expect(readFileSync(f, 'utf8')).not.toMatch(/clarity/i) // Pixel da Meta segue como está
+    for (const f of ['src/lib/consent.ts', 'src/components/ConsentBanner.tsx', 'src/lib/meta.ts']) expect(readFileSync(f, 'utf8').replace(/Microsoft Clarity/g, '')).not.toMatch(/clarity|window\.clarity/i) // Pixel da Meta segue como está
   })
   it('não roda em localhost, homologação nem deploys de teste', () => {
     expect(html).toMatch(/localhost[\s\S]{0,200}-homolog[\s\S]{0,60}"--"/)

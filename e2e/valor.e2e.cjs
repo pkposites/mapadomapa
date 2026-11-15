@@ -48,14 +48,14 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAwS0lEQVR
   const st = async () => page.locator('[data-testid=journey] li').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
   let s = await st()
   check('jornada: conta criada ✓; envio pendente; análise e pedidos bloqueados; perfil NÃO preparado', s.join() === 'done,current,locked,current,locked', s.join())
-  check('obrigatórias × recomendadas separadas', (await page.locator('[data-testid=pend-required]').innerText()).includes('Informe seu nome') && (await page.locator('[data-testid=pend-optional]').innerText()).includes('foto'))
-  check('"Volte sempre" e "Recursos futuros" presentes', (await page.locator('[data-testid=reasons] li').count()) === 5 && (await page.locator('[data-testid=future]').count()) === 1)
+  check('obrigatórias × recomendadas separadas', (await page.locator('[data-testid=pend-required]').innerText()).includes('Informe seu nome') && (await page.locator('[data-testid=pend-optional]').textContent()).includes('foto'))
+  check('"Volte sempre" e "Recursos futuros" presentes', (await page.locator('[data-testid=reasons] li').count()) === 4 && (await page.locator('[data-testid=future]').count()) === 1)
   check('card de Destaque sem número nem promessa de contatos', !/3\+|contatos por semana/.test(await page.locator('[data-testid=boost-card]').innerText()))
 
   console.log('\n[3] Perfil completo muda a jornada (sem marcar o que não ocorreu)')
   await page.goto(B + '/area/perfil'); await page.waitForSelector('#fullName'); await page.waitForLoadState('networkidle'); await page.waitForTimeout(1500) // dev (StrictMode) busca o perfil duas vezes
-  await page.locator('#fullName').fill('Carlos Eduardo Lima'); await page.locator('#bio').fill('Pintor há 8 anos.'); await page.locator('#services').fill('Pintura interna e externa.')
-  await page.getByRole('button', { name: 'Salvar dados' }).click(); await page.waitForSelector('text=Dados salvos.', { timeout: 20000 }).catch(async () => { console.log('DEBUG', errs.slice(0, 2), (await page.locator('main').innerText()).replace(/\n+/g, ' | ').slice(0, 1400)) })
+  await page.locator('#fullName').fill('Carlos Eduardo Lima'); await page.locator('#bio').fill('Pintor há 8 anos.'); await page.getByRole('button', { name: 'Salvar dados' }).click(); await page.getByText('Salvo', { exact: true }).first().waitFor({ timeout: 20000 }).catch(async () => { console.log('DEBUG', errs.slice(0, 2), (await page.locator('main').innerText()).replace(/\n+/g, ' | ').slice(0, 1400)) })
+  await page.locator('[data-testid=sec-servicos] > button').click(); await page.locator('#services').fill('Pintura interna e externa.'); await page.getByRole('button', { name: 'Salvar serviços' }).click(); await page.waitForTimeout(800)
   await page.locator('[data-testid=photo-input]').setInputFiles({ name: 'f.png', mimeType: 'image/png', buffer: PNG }); await page.waitForSelector('[data-testid=avatar]', { timeout: 15000 })
   await page.goto(B + '/area'); await page.waitForSelector('[data-testid=welcome]')
   s = await st()

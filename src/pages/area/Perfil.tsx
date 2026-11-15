@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Camera, LogOut } from 'lucide-react'
+import { BadgeCheck, Camera, ChevronDown, LogOut } from 'lucide-react'
 import AreaShell from '../../area/Shell'
 import Alert from '../../components/ui/Alert'
-import Spinner from '../../components/ui/Spinner'
+import { Sk } from '../../components/ui/Skeleton'
+import { toast } from '../../lib/toast'
 import InstallPrompt from '../../area/InstallPrompt'
 import SubmitButton from '../../components/ui/SubmitButton'
 import { useAuth } from '../../auth/AuthContext'
@@ -12,10 +13,23 @@ import type { Catalog } from '../../pro/types'
 import type { Me } from '../../area/types'
 import { STATUS_TONE } from '../../area/types'
 
-const box = 'rounded-3xl bg-white p-5'
 const label = 'block text-[15px] font-semibold'
 const field = 'mt-2 block w-full rounded-2xl border border-line bg-white px-4 py-3 text-[16px] focus:outline-2 focus:outline-offset-2 focus:outline-graphite'
 const chip = (on: boolean) => `inline-flex min-h-11 items-center rounded-full border px-4 text-[15px] font-medium ${on ? 'border-graphite bg-graphite text-white' : 'border-line bg-white'}`
+
+/** Seção recolhível do perfil: título, resumo e "Editar". */
+function Sec({ id, title, summary, openId, setOpenId, children }: { id: string; title: string; summary: string; openId: string | null; setOpenId: (v: string | null) => void; children: ReactNode }) {
+  const open = openId === id
+  return (
+    <section className="overflow-hidden rounded-2xl bg-white" data-testid={`sec-${id}`}>
+      <button type="button" aria-expanded={open} onClick={() => setOpenId(open ? null : id)} className="flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left">
+        <span className="min-w-0 flex-1"><span className="block text-body font-semibold">{title}</span><span className="block truncate text-small text-muted">{summary}</span></span>
+        <span className="flex items-center gap-1 text-small font-semibold underline decoration-lime decoration-2 underline-offset-4">{open ? 'Fechar' : 'Editar'}<ChevronDown size={18} className={open ? 'rotate-180' : ''} aria-hidden="true" /></span>
+      </button>
+      {open && <div className="animate-[route-in_.18s_ease-out] border-t border-line px-4 pb-5 pt-1">{children}</div>}
+    </section>
+  )
+}
 
 /** Reduz a foto no próprio celular (máx. 512 px, JPEG) antes de enviar. */
 async function shrink(file: File): Promise<string> {
@@ -39,6 +53,7 @@ export default function Perfil() {
   const [work, setWork] = useState({ weekdays: [] as string[], periods: [] as string[], emergency: false, ownTools: '', vehicle: '', workStructure: '' })
   const [regs, setRegs] = useState<string[]>([])
   const file = useRef<HTMLInputElement>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
   const { user } = useAuth()
 
   const apply = (m: Me) => {
@@ -50,68 +65,95 @@ export default function Perfil() {
   }
   // Carrega o perfil UMA vez (antes dependia de "user" e podia apagar o que a pessoa já tinha digitado).
   useEffect(() => {
-    api.get<Me>('/pro/me').then(apply).catch(() => setMsg({ tone: 'error', text: 'Não foi possível carregar o perfil.', at: 'top' }))
+    api.get<Me>('/pro/me').then((m) => { apply(m); if (!m.fullName) setOpenId('dados') }).catch(() => setMsg({ tone: 'error', text: 'Não foi possível carregar o perfil.', at: 'top' }))
     api.get<Catalog>('/pro/catalog').then(setCat).catch(() => undefined)
   }, [])
   useEffect(() => { if (user) setPhone({ phone: user.phone, verified: user.phoneVerified }) }, [user])
 
   const run = async (key: string, fn: () => Promise<Me>, ok: string) => {
     setBusy(key); setMsg(null)
-    try { apply(await fn()); setMsg({ tone: 'success', text: ok, at: key }) } catch (e) { setMsg({ tone: 'error', text: e instanceof ApiError ? e.message : 'Algo deu errado.', at: key }) } finally { setBusy(null) }
+    try { apply(await fn()); setMsg({ tone: 'success', text: ok, at: key }); toast('Salvo'); if (key !== 'photo') setOpenId(null) } catch (e) { setMsg({ tone: 'error', text: e instanceof ApiError ? e.message : 'Algo deu errado.', at: key }) } finally { setBusy(null) }
   }
   const toggle = (list: string[], v: string, max = 99) => (list.includes(v) ? list.filter((x) => x !== v) : list.length >= max ? list : [...list, v])
   const note = (key: string) => msg?.at === key && <div className="mt-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>
 
-  if (!me || !cat) return <AreaShell>{msg ? <Alert tone="error">{msg.text}</Alert> : <div className="grid place-items-center py-20"><Spinner /></div>}</AreaShell>
+  if (!me || !cat) return <AreaShell>{msg ? <Alert tone="error">{msg.text}</Alert> : <div role="status" aria-label="Carregando" className="space-y-3"><Sk className="h-56" /><Sk className="h-16" /><Sk className="h-16" /><Sk className="h-16" /></div>}</AreaShell>
   const blocked = ['rejected', 'suspended'].includes(me.status)
+
+  // Completude: 7 itens que já existem no cadastro
+  const items = [
+    ['nome', Boolean(me.fullName)], ['apresentação', Boolean(me.bio)], ['serviços', Boolean(me.services)], ['foto de perfil', Boolean(me.photoVersion)],
+    ['profissões', me.professions.length > 0], ['regiões', me.regions.length > 0],
+    ['dias e forma de atendimento', Boolean(me.availability?.weekdays?.length && me.availability?.periods?.length && me.ownTools && me.vehicle && me.workStructure)],
+  ] as const
+  const pct = Math.round((items.filter(([, ok]) => ok).length / items.length) * 100)
+  const missing = items.find(([, ok]) => !ok)?.[0]
+  const regionNames = cat.regions.filter((r) => me.regions.includes(r.slug)).map((r) => r.name)
+  const ini = (me.fullName ?? '').trim().split(/\s+/).slice(0, 2).map((x) => x[0]?.toUpperCase() ?? '').join('')
+  const sec = { openId, setOpenId }
 
   return (
     <AreaShell>
-      <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Meu Perfil</h1>
-      <p className={`mt-2 inline-block rounded-full px-3.5 py-1.5 text-[14px] font-semibold ${STATUS_TONE[me.status] ?? 'bg-ice'}`}>{me.statusLabel}</p>
-      {blocked && <div className="mt-4"><Alert tone="error">Seu cadastro está bloqueado para edição. Fale com a equipe pela caixa de mensagens.</Alert></div>}
+      <h1 className="sr-only">Meu Perfil</h1>
+      {blocked && <div className="mb-3"><Alert tone="error">Seu cadastro está bloqueado para edição. Fale com a equipe pela caixa de mensagens.</Alert></div>}
 
-      <div className="mt-5 space-y-5">
-        <section className={`${box} flex items-center gap-4`} aria-label="Foto de perfil">
-          <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-full bg-ice">
-            {me.photoVersion ? <img src={`/api/pro/photo?v=${me.photoVersion}`} alt="Sua foto de perfil" className="size-full object-cover" data-testid="avatar" /> : <Camera size={28} className="text-muted" aria-hidden="true" />}
-          </div>
-          <div className="min-w-0 flex-1">
-            <input ref={file} type="file" accept="image/*" hidden data-testid="photo-input"
-              onChange={async (e) => { const fl = e.target.files?.[0]; e.target.value = ''; if (!fl) return; await run('photo', async () => api.put<Me>('/pro/photo', { dataUrl: await shrink(fl) }), 'Foto atualizada.') }} />
-            <button type="button" disabled={busy === 'photo'} onClick={() => file.current?.click()} className="min-h-11 rounded-xl border border-line px-4 text-[15px] font-semibold">{me.photoVersion ? 'Trocar foto' : 'Adicionar foto'}</button>
-            {me.photoVersion && <button type="button" onClick={() => run('photo', () => api.del<Me>('/pro/photo'), 'Foto removida.')} className="ml-2 min-h-11 px-3 text-[14px] text-muted underline">Remover</button>}
-            {note('photo')}
-          </div>
-        </section>
+      {/* Identidade */}
+      <section className="rounded-2xl bg-white px-4 pb-4 pt-5 text-center" aria-label="Seu perfil" data-testid="identity">
+        <input ref={file} type="file" accept="image/*" hidden data-testid="photo-input"
+          onChange={async (e) => { const fl = e.target.files?.[0]; e.target.value = ''; if (!fl) return; await run('photo', async () => api.put<Me>('/pro/photo', { dataUrl: await shrink(fl) }), 'Foto atualizada.') }} />
+        <button type="button" onClick={() => file.current?.click()} disabled={busy === 'photo'} aria-label={me.photoVersion ? 'Trocar foto de perfil' : 'Adicionar foto de perfil'} className="relative mx-auto block size-28 rounded-full">
+          <span className="grid size-28 place-items-center overflow-hidden rounded-full bg-lime text-[36px] font-bold text-graphite ring-4 ring-lime/60">
+            {me.photoVersion ? <img src={`/api/pro/photo?v=${me.photoVersion}`} alt="Sua foto de perfil" className="size-full object-cover" data-testid="avatar" /> : ini || <Camera size={36} aria-hidden="true" />}
+          </span>
+          <span className="absolute -bottom-1 -right-1 grid size-9 place-items-center rounded-full border-2 border-white bg-graphite text-white"><Camera size={16} aria-hidden="true" /></span>
+        </button>
+        {me.photoVersion && <button type="button" onClick={() => run('photo', () => api.del<Me>('/pro/photo'), 'Foto removida.')} className="mt-1 min-h-11 px-3 text-small text-muted underline">Remover foto</button>}
+        <p className="mt-2 text-heading font-bold tracking-[-0.01em]" data-clarity-mask="true">{me.fullName ?? 'Seu nome'}</p>
+        <p className="text-small text-muted">{me.professions.map((x) => x.name).join(' · ') || 'Profissão não escolhida'}{regionNames.length ? ` · ${regionNames.join(', ')}` : ''}</p>
+        <p className={`mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-small font-semibold ${STATUS_TONE[me.status] ?? 'bg-ice'}`}>{me.status === 'approved' && <BadgeCheck size={16} aria-hidden="true" />}{me.statusLabel}</p>
+        <div className="mt-4 text-left" data-testid="completeness">
+          <div className="flex justify-between text-small font-semibold"><span>Perfil completo</span><span>{pct}%</span></div>
+          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-line" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Perfil completo"><div className="h-full rounded-full bg-lime transition-all" style={{ width: `${pct}%` }} /></div>
+          <p className="mt-1.5 text-tiny text-muted">{missing ? `Falta: ${missing}.` : 'Tudo preenchido. Ótimo!'}</p>
+        </div>
+      </section>
+      {note('photo')}
 
-        <form className={box} onSubmit={(e) => { e.preventDefault(); void run('data', () => api.put<Me>('/pro/me', f), 'Dados salvos.') }}>
-          <h2 className="text-[18px] font-bold">Dados pessoais</h2>
-          <label htmlFor="fullName" className={`${label} mt-4`}>Nome completo</label>
-          <input id="fullName" autoComplete="name" maxLength={80} value={f.fullName} onChange={(e) => setF({ ...f, fullName: e.target.value })} className={`${field} min-h-13`} disabled={blocked} />
-          <p className={`${label} mt-4`}>Celular</p>
-          <p className="mt-1 text-[16px]" data-testid="my-phone">{phone?.phone} <span className="ml-2 rounded-full bg-ice px-2.5 py-1 text-[13px] text-muted">{phone?.verified ? 'verificado' : 'não verificado'}</span></p>
-          <p className="mt-1 text-[13px] leading-snug text-muted">O celular só pode ser alterado pela equipe. {phone?.verified ? '' : 'A verificação é feita manualmente pela equipe durante a análise do cadastro; se tiver dúvidas, escreva em Mensagens.'}</p>
-          <label htmlFor="bio" className={`${label} mt-4`}>Apresentação profissional</label>
-          <textarea id="bio" rows={4} maxLength={600} value={f.bio} onChange={(e) => setF({ ...f, bio: e.target.value })} className={field} disabled={blocked} placeholder="Conte quem você é e como trabalha." />
-          <label htmlFor="services" className={`${label} mt-4`}>Serviços que você realiza</label>
-          <textarea id="services" rows={3} maxLength={600} value={f.services} onChange={(e) => setF({ ...f, services: e.target.value })} className={field} disabled={blocked} placeholder="Ex.: pintura interna, texturas, reparos em parede." />
-          <label htmlFor="extra" className={`${label} mt-4`}>Outras informações relevantes</label>
-          <textarea id="extra" rows={3} maxLength={600} value={f.extraInfo} onChange={(e) => setF({ ...f, extraInfo: e.target.value })} className={field} disabled={blocked} placeholder="Certificados, garantia, atendimento de emergência…" />
-          <div className="mt-5"><SubmitButton loading={busy === 'data'} disabled={blocked}>Salvar dados</SubmitButton></div>
-          {note('data')}
-        </form>
+      <div className="mt-3 space-y-3">
+        <Sec id="dados" title="Dados pessoais" summary={`${me.fullName ?? 'Informe seu nome'} · ${phone?.phone ?? ''}`} {...sec}>
+          <form onSubmit={(e) => { e.preventDefault(); void run('data', () => api.put<Me>('/pro/me', f), 'Dados salvos.') }}>
+            <label htmlFor="fullName" className={`${label} mt-3`}>Nome completo</label>
+            <input id="fullName" autoComplete="name" maxLength={80} value={f.fullName} onChange={(e) => setF({ ...f, fullName: e.target.value })} className={`${field} min-h-13`} disabled={blocked} />
+            <p className={`${label} mt-4`}>Celular</p>
+            <p className="mt-1 text-[16px]" data-testid="my-phone">{phone?.phone} <span className="ml-2 rounded-full bg-ice px-2.5 py-1 text-[13px] text-muted">{phone?.verified ? 'verificado' : 'não verificado'}</span></p>
+            <p className="mt-1 text-[13px] leading-snug text-muted">O celular só pode ser alterado pela equipe. {phone?.verified ? '' : 'A verificação é feita manualmente pela equipe durante a análise do cadastro; se tiver dúvidas, escreva em Mensagens.'}</p>
+            <label htmlFor="bio" className={`${label} mt-4`}>Apresentação profissional</label>
+            <textarea id="bio" rows={4} maxLength={600} value={f.bio} onChange={(e) => setF({ ...f, bio: e.target.value })} className={field} disabled={blocked} placeholder="Conte quem você é e como trabalha." />
+            <div className="mt-5"><SubmitButton loading={busy === 'data'} disabled={blocked}>Salvar dados</SubmitButton></div>
+            {note('data')}
+          </form>
+        </Sec>
 
-        <section className={box}>
-          <h2 className="text-[18px] font-bold">Profissões</h2>
+        <Sec id="servicos" title="Serviços" summary={me.services ?? 'Descreva o que você faz'} {...sec}>
+          <form onSubmit={(e) => { e.preventDefault(); void run('data', () => api.put<Me>('/pro/me', f), 'Serviços salvos.') }}>
+            <label htmlFor="services" className={`${label} mt-3`}>Serviços que você realiza</label>
+            <textarea id="services" rows={4} maxLength={600} value={f.services} onChange={(e) => setF({ ...f, services: e.target.value })} className={field} disabled={blocked} placeholder="Ex.: pintura interna, texturas, reparos em parede." />
+            <label htmlFor="extra" className={`${label} mt-4`}>Outras informações relevantes</label>
+            <textarea id="extra" rows={3} maxLength={600} value={f.extraInfo} onChange={(e) => setF({ ...f, extraInfo: e.target.value })} className={field} disabled={blocked} placeholder="Certificados, garantia, atendimento de emergência…" />
+            <div className="mt-5"><SubmitButton loading={busy === 'data'} disabled={blocked || f.fullName.trim().length < 3}>Salvar serviços</SubmitButton></div>
+            {note('data')}
+          </form>
+        </Sec>
+
+        <Sec id="profissoes" title="Profissões" summary={me.professions.map((x) => x.name).join(' · ') || 'Nenhuma escolhida ainda'} {...sec}>
           <ul className="mt-3 space-y-1">{me.professions.map((p) => <li key={p.slug} className="text-[16px] font-semibold">• {p.name}</li>)}{me.professions.length === 0 && <li className="text-muted">Nenhuma escolhida ainda.</li>}</ul>
           {me.canEditProfessions
             ? <p className="mt-3 text-[15px]"><Link to="/profissional" className="font-semibold underline decoration-lime decoration-2 underline-offset-4">Editar no cadastro</Link></p>
             : <p className="mt-3 text-[14px] leading-snug text-muted">Para trocar de profissão, a equipe precisa reavaliar seu cadastro. <Link className="font-semibold text-graphite underline" to="/area/mensagens" state={{ prefill: 'Quero solicitar a troca das minhas profissões.' }}>Solicitar alteração</Link></p>}
-        </section>
+        </Sec>
 
-        <form className={box} onSubmit={(e) => { e.preventDefault(); void run('work', () => api.put<Me>('/pro/me/work', { experience: exp, availability: { weekdays: work.weekdays, periods: work.periods, emergency: work.emergency }, ownTools: work.ownTools, vehicle: work.vehicle, workStructure: work.workStructure }), 'Informações de trabalho salvas.') }}>
-          <h2 className="text-[18px] font-bold">Experiência e atendimento</h2>
+        <Sec id="experiencia" title="Experiência e atendimento" summary={me.professions.length ? me.professions.map((x) => `${x.experienceYears ?? 0} anos`).join(' · ') : 'Não informada'} {...sec}>
+          <form onSubmit={(e) => { e.preventDefault(); void run('work', () => api.put<Me>('/pro/me/work', { experience: exp, availability: { weekdays: work.weekdays, periods: work.periods, emergency: work.emergency }, ownTools: work.ownTools, vehicle: work.vehicle, workStructure: work.workStructure }), 'Informações de trabalho salvas.') }}>
           {me.professions.map((p) => (
             <fieldset key={p.slug} className="mt-4"><legend className={label}>{p.name}</legend>
               <div className="mt-2 flex gap-3">
@@ -134,20 +176,20 @@ export default function Perfil() {
           ))}
           <div className="mt-5"><SubmitButton loading={busy === 'work'} disabled={blocked || work.weekdays.length === 0 || work.periods.length === 0 || !work.ownTools || !work.vehicle || !work.workStructure}>Salvar informações</SubmitButton></div>
           {note('work')}
-        </form>
+          </form>
+        </Sec>
 
-        <section className={box}>
-          <h2 className="text-[18px] font-bold">Regiões atendidas</h2>
+        <Sec id="regioes" title="Regiões atendidas" summary={regionNames.join(' · ') || 'Nenhuma escolhida'} {...sec}>
           <p className="mt-1 text-[14px] text-muted">Até {cat.limits.regions} regiões.{me.regionsChangeResubmits && ' Alterar as regiões envia seu cadastro para nova análise e ele deixa de aparecer ao público até ser aprovado.'}</p>
           <div className="mt-3 flex flex-wrap gap-2">{cat.regions.map((r) => <button type="button" key={r.slug} aria-pressed={regs.includes(r.slug)} disabled={!me.canEditRegions || blocked} className={chip(regs.includes(r.slug))} onClick={() => setRegs(toggle(regs, r.slug, cat.limits.regions))}>{r.name}</button>)}</div>
           <div className="mt-4"><SubmitButton type="button" loading={busy === 'regions'} disabled={blocked || !me.canEditRegions || regs.length === 0 || regs.join() === me.regions.join()}
             onClick={() => { if (me.regionsChangeResubmits && !window.confirm('Seu cadastro voltará para análise. Continuar?')) return; void run('regions', () => api.put<Me>('/pro/me/regions', { regions: regs }), me.regionsChangeResubmits ? 'Regiões salvas. Seu cadastro voltou para análise.' : 'Regiões salvas.') }}>Salvar regiões</SubmitButton></div>
           {note('regions')}
-        </section>
+        </Sec>
 
         <InstallPrompt persistent />
 
-        <SubmitButton type="button" variant="ghost" className="border border-line" onClick={async () => { try { await logout(); navigate('/', { replace: true }) } catch { setMsg({ tone: 'error', text: 'Não foi possível sair agora. Tente de novo.', at: 'top' }) } }}><LogOut size={18} aria-hidden="true" /> Sair da conta</SubmitButton>
+        <SubmitButton type="button" variant="ghost" className="border border-line bg-white" onClick={async () => { try { await logout(); navigate('/', { replace: true }) } catch { setMsg({ tone: 'error', text: 'Não foi possível sair agora. Tente de novo.', at: 'top' }) } }}><LogOut size={18} aria-hidden="true" /> Sair da conta</SubmitButton>
         {note('top')}
       </div>
     </AreaShell>

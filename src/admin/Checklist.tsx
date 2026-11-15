@@ -22,11 +22,11 @@ export default function Checklist({ d }: { d: Detail }) {
   return (
     <section className="mt-4 rounded-3xl bg-white p-5" data-testid="checklist" aria-label="Resumo para decidir">
       <h2 className="mb-1 text-[18px] font-semibold tracking-tight">Para decidir</h2>
-      <p className={`mb-3 text-[14px] font-medium ${core ? 'text-[#2b8a00]' : 'text-muted'}`}>{d.reviewStatus === 'pending_review' ? (core ? 'Dados essenciais conferidos. Veja os alertas abaixo e decida.' : 'Faltam dados essenciais.') : 'Resumo do cadastro.'}</p>
+      <p className={`mb-3 text-[14px] font-medium ${core ? 'text-ok' : 'text-muted'}`}>{d.reviewStatus === 'pending_review' ? (core ? 'Dados essenciais conferidos. Veja os alertas abaixo e decida.' : 'Faltam dados essenciais.') : 'Resumo do cadastro.'}</p>
       <ul className="space-y-2.5">
         {rows.map((r) => (
           <li key={r.text} className="flex gap-2.5 text-[15px] leading-snug" data-ok={r.ok}>
-            {r.ok ? <CheckCircle2 size={19} className="mt-0.5 shrink-0 text-[#2b8a00]" aria-hidden="true" /> : r.warn ? <AlertTriangle size={19} className="mt-0.5 shrink-0 text-[#b26a00]" aria-hidden="true" /> : <Circle size={19} className="mt-0.5 shrink-0 text-muted" aria-hidden="true" />}
+            {r.ok ? <CheckCircle2 size={19} className="mt-0.5 shrink-0 text-ok" aria-hidden="true" /> : r.warn ? <AlertTriangle size={19} className="mt-0.5 shrink-0 text-[#b26a00]" aria-hidden="true" /> : <Circle size={19} className="mt-0.5 shrink-0 text-muted" aria-hidden="true" />}
             <span><span className="font-medium">{r.text}</span>{r.hint && <span className="block text-[13px] text-muted">{r.hint}</span>}</span>
           </li>
         ))}

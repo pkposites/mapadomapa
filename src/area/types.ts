@@ -18,7 +18,7 @@ export type Me = {
 }
 export type Msg = { id: string; from: 'admin' | 'professional'; kind: string; body: string; at: string; unread: boolean }
 export const STATUS_TONE: Record<string, string> = {
-  not_submitted: 'bg-ice text-graphite', pending_review: 'bg-[#fff6dd] text-[#7a5a00]', approved: 'bg-[#e4f9c9] text-[#2b5a00]',
+  not_submitted: 'bg-white text-graphite ring-1 ring-line', pending_review: 'bg-[#fff6dd] text-[#7a5a00]', approved: 'bg-[#e4f9c9] text-[#2b5a00]',
   needs_changes: 'bg-[#fff0e0] text-[#8a3b00]', rejected: 'bg-[#fef3f2] text-[#7a271a]', suspended: 'bg-[#fef3f2] text-[#7a271a]',
 }
 export const STATUS_HINT: Record<string, string> = {

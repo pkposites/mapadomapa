@@ -23,7 +23,7 @@ export function Field({ id, label, hint, error, children }: FieldProps) {
 }
 
 const input = (error?: boolean) =>
-  `mt-2 block min-h-13 w-full rounded-2xl border bg-white px-4 text-[17px] text-graphite transition-colors duration-150 placeholder:text-[#9aa39c] focus:outline-2 focus:outline-offset-2 focus:outline-graphite ${
+  `mt-2 block min-h-13 w-full rounded-2xl border bg-white px-4 text-[17px] text-graphite transition-colors duration-150 placeholder:text-placeholder focus:outline-2 focus:outline-offset-2 focus:outline-graphite ${
     error ? 'border-danger' : 'border-line hover:border-[#c9d0c7]'
   }`
 
@@ -60,7 +60,7 @@ export function PhoneField({ id, label, hint, error, value, onChange, ...rest }:
           onChange={(e) => onChange(maskPhone(e.target.value))}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : undefined}
-          className="min-h-13 min-w-0 flex-1 rounded-r-2xl bg-transparent pr-4 text-[17px] text-graphite outline-none placeholder:text-[#9aa39c]"
+          className="min-h-13 min-w-0 flex-1 rounded-r-2xl bg-transparent pr-4 text-[17px] text-graphite outline-none placeholder:text-placeholder"
         />
       </div>
     </Field>

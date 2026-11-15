@@ -11,6 +11,17 @@
   --color-line: #e1e6df;
   --color-on-dark: #aab3ac;
   --color-danger: #b42318;
+  --color-ok: #25780a; /* verde de apoio com contraste ≥ 4,5:1 sobre branco */
+  --color-placeholder: #6b756d; /* texto-guia dos campos (4,8:1 sobre branco) */
+
+  /* Escala de tipos do app: 28 / 20 / 16 / 14 / 12 */
+  --text-title: 1.75rem;
+  --text-title--line-height: 1.15;
+  --text-heading: 1.25rem;
+  --text-heading--line-height: 1.25;
+  --text-body: 1rem;
+  --text-small: 0.875rem;
+  --text-tiny: 0.75rem;
 
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system,
     'Segoe UI', Roboto, sans-serif;
@@ -85,3 +96,9 @@
     scroll-behavior: auto !important;
   }
 }
+
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+@keyframes route-in { from { opacity: 0; transform: translateX(10px) } to { opacity: 1; transform: none } }
+@keyframes sheet-up { from { transform: translateY(100%) } to { transform: none } }
+@keyframes heart-pop { 0% { opacity: 0; transform: scale(.4) } 25% { opacity: 1; transform: scale(1.15) } 60% { opacity: 1; transform: scale(1) } 100% { opacity: 0; transform: scale(1.05) } }
+@media (prefers-reduced-motion: reduce) { .route-in, .sheet-up { animation: none !important } }

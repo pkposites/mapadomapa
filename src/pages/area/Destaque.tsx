@@ -54,7 +54,7 @@ export default function Destaque() {
 
       {d && !editing && d.interest && (
         <section className="mt-5 rounded-3xl bg-white p-5" data-testid="boost-done">
-          <p className="flex items-center gap-2 text-[18px] font-bold"><CheckCircle2 size={22} className="text-[#2b8a00]" aria-hidden="true" /> Interesse registrado!</p>
+          <p className="flex items-center gap-2 text-[18px] font-bold"><CheckCircle2 size={22} className="text-ok" aria-hidden="true" /> Interesse registrado!</p>
           <p className="mt-2 text-[15px] leading-snug text-muted">Obrigado! Você está na lista e a equipe vai avisar você aqui, em Mensagens, quando o Destaque estiver disponível, antes de qualquer cobrança.</p>
           <p className="mt-3 text-[14px]"><strong>Investimento:</strong> {d.options.budgets.find((b) => b.id === d.interest!.budget)?.label}</p>
           <p className="mt-1 text-[14px]"><strong>Mais importa:</strong> {d.interest.priorities.map((p) => d.options.priorities.find((o) => o.id === p)?.label).join('; ')}</p>

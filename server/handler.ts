@@ -164,7 +164,7 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (method === 'DELETE' && path === '/pro/photo') return json(await area.removePhoto(me.userId))
     if (method === 'GET' && path === '/pro/photo') return photoResponse(await area.getPhoto(me.userId))
     if (method === 'GET' && path === '/pro/messages') return json(await area.thread(me.userId, 'professional'))
-    if (method === 'GET' && path === '/pro/messages/unread') return json({ unread: await area.unreadCount(me.userId) })
+    if (method === 'GET' && path === '/pro/messages/unread') return json(await area.shellInfo(me.userId))
     if (method === 'POST' && path === '/pro/messages') { const b = await readJson(req); return json(await area.postMessage(me.userId, 'professional', me.userId, b.body, b.kind === 'change_request' ? 'change_request' : 'message')) }
     if (method === 'GET' && path === '/pro/announcements') return json(await area.listAnnouncements(me.userId))
     if (method === 'POST' && path === '/pro/announcements/read') return json(await area.markAnnouncementsRead(me.userId))
