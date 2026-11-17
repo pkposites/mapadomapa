@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { CalendarDays, CheckCircle2, Inbox, MapPin } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Bell, CalendarDays, CheckCircle2, Inbox, MapPin, RefreshCw } from 'lucide-react'
 import AreaShell from '../../area/Shell'
 import BoostCard from '../../area/BoostCard'
 import Alert from '../../components/ui/Alert'
@@ -15,31 +15,47 @@ export default function Pedidos() {
   const [data, setData] = useState<{ allowed: boolean; items: Opp[] } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
-  useEffect(() => { api.get<{ allowed: boolean; items: Opp[] }>('/pro/requests').then(setData).catch(() => setData({ allowed: false, items: [] })) }, [])
+  const [failed, setFailed] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const load = async () => { setRefreshing(true); try { setData(await api.get<{ allowed: boolean; items: Opp[] }>('/pro/requests')); setFailed(false) } catch { setFailed(true) } finally { setRefreshing(false) } }
+  useEffect(() => {
+    void load()
+    const refresh = () => { if (document.visibilityState === 'visible') void load() }
+    const timer = window.setInterval(refresh, 30000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh) }
+  }, [])
+  const scrolled = useRef(false)
+  useEffect(() => { if (data && !scrolled.current && window.location.hash.startsWith('#pedido-')) { const item = document.getElementById(window.location.hash.slice(1)); if (item) { item.scrollIntoView({block:'center'}); scrolled.current = true } } }, [data])
 
   const interest = async (o: Opp) => {
     setBusy(o.id); setMsg(null)
     try {
       await api.post(`/pro/requests/${o.id}/interest`)
       setData((d) => d && { ...d, items: d.items.map((x) => (x.id === o.id ? { ...x, interested: true } : x)) })
+      window.dispatchEvent(new Event('mdm:interest'))
       setMsg({ tone: 'success', text: 'Interesse enviado! A equipe entrará em contato se o pedido seguir com você.' })
     } catch (e) { setMsg({ tone: 'error', text: e instanceof ApiError ? e.message : 'Não foi possível enviar agora.' }) } finally { setBusy(null) }
   }
-  const items = data?.items ?? []
+  const items = [...(data?.items ?? [])].sort((a,b) => Number(a.interested)-Number(b.interested) || Number(b.urgency === 'urgent')-Number(a.urgency === 'urgent') || new Date(b.publishedAt).getTime()-new Date(a.publishedAt).getTime())
+  const pending = items.filter(o => !o.interested).length
 
   return (
     <AreaShell>
-      <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Meus Pedidos</h1>
-      {!data && <div className="mt-10 flex justify-center"><Spinner /></div>}
+      <div className="flex items-center justify-between gap-3"><h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Meus Pedidos</h1><button type="button" aria-label="Atualizar pedidos" onClick={() => void load()} disabled={refreshing} className="grid size-11 place-items-center rounded-xl bg-white border border-line disabled:opacity-50"><RefreshCw size={20} aria-hidden="true" /></button></div>
+      {failed && <div className="mt-3"><Alert tone="error">Não foi possível atualizar os pedidos. Tente novamente.</Alert></div>}
+      {!data && !failed && <div className="mt-10 flex justify-center"><Spinner /></div>}
 
       {data && items.length > 0 && (
         <section className="mt-4" aria-label="Oportunidades" data-testid="opportunities">
+          {pending > 0 && <div className="mb-4 flex items-center gap-3 rounded-2xl bg-lime p-4 text-graphite"><Bell size={24} className="shrink-0" aria-hidden="true" /><div><p className="text-[19px] font-bold">{pending} {pending === 1 ? 'pedido aguardando sua resposta' : 'pedidos aguardando sua resposta'}</p><p className="text-[13px]">Confira as oportunidades e responda assim que puder.</p></div></div>}
           <p className="text-[15px] leading-snug text-muted">Pedidos reais compatíveis com a sua profissão e região. Toque em “Tenho interesse” e a equipe fará a conexão com o cliente.</p>
           {msg && <div className="mt-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
           <ul className="mt-4 space-y-3">
             {items.map((o) => (
-              <li key={o.id} className="rounded-3xl bg-white p-5" data-testid="opportunity">
+              <li key={o.id} id={`pedido-${o.id}`} className={`scroll-mt-20 rounded-3xl bg-white p-5 ${!o.interested ? 'border-2 border-graphite' : 'border border-line'}`} data-testid="opportunity">
                 <div className="flex flex-wrap items-center gap-2">
+                  {!o.interested && <span className="rounded-full bg-lime px-3 py-1 text-[12px] font-bold text-graphite">AGUARDANDO RESPOSTA</span>}
                   <span className="rounded-full bg-graphite px-3 py-1 text-[12px] font-semibold text-white">{o.profession}</span>
                   <span className={`rounded-full px-3 py-1 text-[12px] font-semibold ${URG_CLS[o.urgency] ?? 'bg-ice'}`}>{o.urgencyLabel}</span>
                 </div>

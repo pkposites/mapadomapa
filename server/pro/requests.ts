@@ -21,6 +21,8 @@ export async function listOpportunities(userId: string) {
      WHERE r.status = 'published'
        AND EXISTS (SELECT 1 FROM profile_professions pp WHERE pp.user_id = $1 AND pp.profession_id = r.profession_id)
        AND EXISTS (SELECT 1 FROM professional_regions pr WHERE pr.user_id = $1 AND pr.region_id = r.region_id)
+       AND (EXISTS (SELECT 1 FROM service_request_interests i WHERE i.request_id=r.id AND i.user_id=$1)
+         OR (SELECT count(*) FROM service_request_interests i WHERE i.request_id=r.id AND i.selected_at IS NOT NULL) < 2)
      ORDER BY r.published_at DESC, r.id DESC LIMIT 100`, [userId])
   return {
     allowed: true,

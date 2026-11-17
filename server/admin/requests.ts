@@ -74,12 +74,26 @@ export async function requestDetail(id: string) {
      FROM service_request_interests i JOIN users u ON u.id = i.user_id
      LEFT JOIN professional_profiles pr ON pr.user_id = u.id LEFT JOIN phones ph ON ph.user_id = u.id AND ph.is_primary
      WHERE i.request_id = $1 ORDER BY i.created_at`, [id])
+  const compatible = r.status === 'published' ? await query<Row>(
+    `SELECT DISTINCT u.id AS user_id, p.full_name, ph.e164, ph.verified_at
+       FROM professional_profiles p JOIN users u ON u.id=p.user_id
+       JOIN profile_professions pp ON pp.user_id=p.user_id AND pp.profession_id=$2
+       JOIN professional_regions rg ON rg.user_id=p.user_id AND rg.region_id=$3
+       LEFT JOIN phones ph ON ph.user_id=u.id AND ph.is_primary
+       WHERE p.review_status='approved' AND u.status='active'
+       AND NOT EXISTS (SELECT 1 FROM service_request_interests i WHERE i.request_id=$1 AND i.user_id=u.id)
+       ORDER BY p.full_name NULLS LAST, u.id LIMIT 200`, [id, r.profession_id, r.region_id]) : []
   const source = (await query<Row>('SELECT contact_preference, photo_reference FROM deforafora_intake WHERE converted_request_id = $1', [id]))[0]
   return {
     ...summary(r), origin: source ? 'De fora a fora' : null, contactPreference: source?.contact_preference ?? null, photoReference: source?.photo_reference ?? null, description: r.description as string, periodNote: r.period_note as string | null, consent: r.consent as boolean, consentAt: r.consent_at,
     professionSlug: r.profession_slug as string, regionSlug: r.region_slug as string,
     client: { name: r.client_name as string, phone: formatNational(r.client_phone), whatsapp: String(r.client_phone).replace(/\D/g, '') },
     eligible: await eligibleCount(r.profession_id, r.region_id), urgencyOptions: URGENCY,
+    compatible: compatible.map((i) => ({
+      id: i.user_id as string, name: (i.full_name ?? null) as string | null,
+      phone: i.e164 ? formatNational(i.e164) : null, whatsapp: i.e164 ? String(i.e164).replace(/\D/g, '') : null,
+      phoneVerified: Boolean(i.verified_at),
+    })),
     interested: interested.map((i) => ({
       id: i.user_id as string, name: (i.full_name ?? null) as string | null, phone: i.e164 ? formatNational(i.e164) : null, whatsapp: i.e164 ? String(i.e164).replace(/\D/g, '') : null,
       phoneVerified: Boolean(i.verified_at), professions: (i.professions ?? []) as string[], regions: (i.regions ?? []) as string[], at: i.created_at, selectedAt: i.selected_at ?? null,
@@ -158,13 +172,13 @@ export async function convertIntake(adminId: string, intakeId: string, body: Rec
 }
 
 /** Seleção definitiva: máximo de dois interessados elegíveis, mesmo com admins simultâneos. */
-export async function selectInterest(adminId: string, id: string, userId: string) {
+export async function selectInterest(adminId: string, id: string, userId: string, confirmedViaWhatsApp = false) {
   await withTransaction(async (tx) => {
     const r = (await query<Row>('SELECT status, consent, profession_id, region_id FROM service_requests WHERE id = $1 FOR UPDATE', [id], tx))[0]
     if (!r || r.status !== 'published' || !r.consent) throw new ApiError(409, 'not_open', 'Pedido não está aberto ou autorizado.')
     const interest = (await query<Row>('SELECT selected_at FROM service_request_interests WHERE request_id = $1 AND user_id = $2', [id, userId], tx))[0]
-    if (!interest) throw new ApiError(404, 'not_interested', 'Profissional não manifestou interesse.')
-    if (interest.selected_at) return
+    if (!interest && !confirmedViaWhatsApp) throw new ApiError(404, 'not_interested', 'Profissional não manifestou interesse.')
+    if (interest?.selected_at) return
     const [{ n }] = await query<Row>('SELECT count(*)::int AS n FROM service_request_interests WHERE request_id = $1 AND selected_at IS NOT NULL', [id], tx)
     if (n >= 2) throw new ApiError(409, 'selection_limit', 'Já foram selecionados dois profissionais.')
     const eligible = (await query<Row>(`SELECT 1 FROM professional_profiles p JOIN users u ON u.id=p.user_id
@@ -172,8 +186,10 @@ export async function selectInterest(adminId: string, id: string, userId: string
       JOIN professional_regions rg ON rg.user_id=p.user_id AND rg.region_id=$3
       WHERE p.user_id=$1 AND p.review_status='approved' AND u.status='active'`, [userId,r.profession_id,r.region_id], tx))[0]
     if (!eligible) throw new ApiError(409, 'not_eligible', 'Profissional não está mais apto para este pedido.')
+    // A administração só confirma por WhatsApp depois de receber o aceite explícito.
+    if (!interest && confirmedViaWhatsApp) await query('INSERT INTO service_request_interests (request_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [id,userId], tx)
     await query('UPDATE service_request_interests SET selected_at=$3 WHERE request_id=$1 AND user_id=$2', [id,userId,now()], tx)
   })
-  await audit('admin.request_professional_selected', { userId: adminId, details: { id, professionalId: userId } })
+  await audit('admin.request_professional_selected', { userId: adminId, details: { id, professionalId: userId, confirmedViaWhatsApp } })
   return requestDetail(id)
 }

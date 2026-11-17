@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
-import { ClipboardList, House, MessageSquare, Newspaper, UserRound } from 'lucide-react'
+import { Link, NavLink, useLocation } from 'react-router-dom'
+import { ArrowRight, Bell, ClipboardList, House, MessageSquare, Newspaper, UserRound } from 'lucide-react'
 import Logo from '../components/Logo'
 import { api } from '../lib/api'
 
@@ -13,14 +13,12 @@ const TABS = [
 ] as const
 
 /** Moldura da Área do Profissional: barra superior escura + navegação inferior (pensada para o celular). */
-const SEEN = 'mdm_pedidos_seen'
-const readSeen = () => { try { return localStorage.getItem(SEEN) === '1' } catch { return false } }
 
 export default function AreaShell({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState(0)
   const { pathname } = useLocation()
-  const [seen, setSeen] = useState(readSeen) // destaque leve em "Pedidos" até a pessoa abrir a tela
-  useEffect(() => { if (pathname === '/area/pedidos' && !seen) { try { localStorage.setItem(SEEN, '1') } catch { /* sem storage */ } setSeen(true) } }, [pathname, seen])
+  const [pending, setPending] = useState(0)
+  const [urgent, setUrgent] = useState(0)
   useEffect(() => {
     const load = () => api.get<{ unread: number }>('/pro/messages/unread').then((r) => setUnread(r.unread)).catch(() => {})
     void load()
@@ -29,13 +27,34 @@ export default function AreaShell({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [pathname])
 
+  useEffect(() => {
+    let alive = true
+    const refresh = () => { if (document.visibilityState !== 'visible') return; api.get<{ allowed: boolean; items: { interested: boolean; urgency: string }[] }>('/pro/requests').then(r => {
+      if (!alive) return
+      const active = r.allowed ? r.items.filter(i => !i.interested) : []
+      setPending(active.length)
+      setUrgent(active.filter(i => i.urgency === 'urgent').length)
+    }).catch(() => {}) }
+    refresh()
+    const timer = window.setInterval(refresh, 30000)
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('mdm:interest', refresh)
+    return () => { alive = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh); window.removeEventListener('mdm:interest', refresh) }
+  }, [pathname])
+
   return (
     <div className="min-h-dvh bg-ice">
       <header className="sticky top-0 z-30 bg-graphite pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-14 max-w-lg items-center px-5"><Logo /></div>
       </header>
       {/* Perfil e Mensagens têm dados pessoais: o Clarity não grava o conteúdo destas telas */}
-      <main data-clarity-mask={pathname.startsWith('/area/perfil') || pathname.startsWith('/area/mensagens') ? 'true' : undefined} className="mx-auto max-w-lg px-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-6">{children}</main>
+      <main data-clarity-mask={pathname.startsWith('/area/perfil') || pathname.startsWith('/area/mensagens') ? 'true' : undefined} className="mx-auto max-w-lg px-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-6">
+        {pending > 0 && pathname !== '/area/pedidos' && <Link to="/area/pedidos" className="mb-5 flex items-center gap-3 rounded-3xl border-2 border-graphite bg-lime p-4 text-graphite shadow-sm">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-graphite text-lime"><Bell size={24} aria-hidden="true" /></span>
+          <span className="flex-1"><span className="block text-[12px] font-bold uppercase tracking-wide">{urgent ? 'Pedido urgente disponível!' : 'Nova oportunidade!'}</span><span className="block text-[19px] font-bold leading-tight">{pending} {pending === 1 ? 'pedido para você' : 'pedidos para você'}</span><span className="block text-[13px] font-semibold">Veja os detalhes e manifeste interesse</span></span>
+          <ArrowRight size={22} className="shrink-0" aria-hidden="true" />
+        </Link>}
+        {children}</main>
       <nav aria-label="Área do profissional" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
         <ul className="mx-auto grid max-w-lg grid-cols-5">
           {TABS.map(({ to, label, Icon, end }) => (
@@ -45,9 +64,7 @@ export default function AreaShell({ children }: { children: ReactNode }) {
                   <>
                     <span className={`grid h-7 w-12 place-items-center rounded-full ${isActive ? 'bg-lime' : ''}`}><Icon size={22} strokeWidth={isActive ? 2.25 : 1.75} aria-hidden="true" /></span>
                     {label}
-                    {to === '/area/pedidos' && !seen && (
-                      <span aria-hidden="true" data-testid="pedidos-dot" className="absolute right-[26%] top-2.5 size-2.5"><span className="absolute inset-0 rounded-full bg-lime motion-safe:animate-ping opacity-60" /><span className="absolute inset-0 rounded-full bg-lime ring-2 ring-white" /></span>
-                    )}
+                    {to === '/area/pedidos' && pending > 0 && <span aria-label={`${pending} pedidos aguardando resposta`} className="absolute right-[17%] top-1 grid min-w-5 place-items-center rounded-full bg-danger px-1 text-[11px] font-bold leading-5 text-white ring-2 ring-white">{pending > 99 ? '99+' : pending}</span>}
                     {to === '/area/mensagens' && unread > 0 && (
                       <span aria-label={`${unread} não lidas`} className="absolute right-[22%] top-2 grid min-w-5 place-items-center rounded-full bg-danger px-1 text-[11px] font-bold leading-5 text-white">{unread}</span>
                     )}

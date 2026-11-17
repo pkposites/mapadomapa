@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, MessageCircle, Plus, UserRound } from 'lucide-react'
+import { ArrowLeft, Clock, MessageCircle, Plus, RefreshCw, UserRound } from 'lucide-react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import Alert from '../components/ui/Alert'
@@ -26,6 +26,7 @@ type Detail = Summary & {
   origin?: string | null; contactPreference?: string | null; photoReference?: string | null
   description: string; periodNote: string | null; consent: boolean; consentAt: string | null; professionSlug: string; regionSlug: string; eligible: number
   client: { name: string; phone: string; whatsapp: string }
+  compatible?: { id: string; name: string | null; phone: string | null; whatsapp: string | null; phoneVerified: boolean }[]
   interested: { id: string; name: string | null; phone: string | null; whatsapp: string | null; phoneVerified: boolean; professions: string[]; regions: string[]; at: string; selectedAt?: string | null }[]
 }
 const fmt = (d: string) => new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
@@ -89,7 +90,7 @@ function List() {
           <div className="flex items-start justify-between gap-3"><p className="text-[17px] font-semibold leading-snug">{r.title}</p><Badge s={r.status} /></div>
           <p className="mt-1 text-[14px] text-muted">{r.profession} · {r.region} · {r.neighborhood}</p>
           <p className="mt-1 text-[13px] text-muted">{urgencyLabel(r.urgency)} · Cliente: {r.clientName}</p>
-          {r.status !== 'draft' && <p className="mt-2 flex items-center gap-1.5 text-[14px] font-semibold"><UserRound size={16} aria-hidden="true" /> {r.interests} interessado(s)</p>}
+          {r.status !== 'draft' && <p className="mt-2 flex items-center gap-1.5 text-[14px] font-semibold"><UserRound size={16} aria-hidden="true" /> {r.interests} interessado(s)</p>}{r.status === 'published' && r.interests === 0 && <p className="mt-2 rounded-xl bg-[#fff4db] px-3 py-2 text-[13px] font-bold text-[#7a5a00]">{r.urgency === 'urgent' ? 'Urgente · ' : ''}Aguardando resposta · acionar profissionais →</p>}
         </Link></li>))}</ul>
     </Shell>
   )
@@ -185,6 +186,11 @@ function DetailPage() {
   const act = async (fn: () => Promise<unknown>) => { setBusy(true); setErr(null); try { await fn(); await load() } catch (e) { setErr(e instanceof ApiError ? e.message : 'Algo deu errado.') } finally { setBusy(false) } }
   if (!d) return <Shell title="Pedido" back="/admin/pedidos">{err ? <div className="mt-4"><Alert tone="error">{err}</Alert></div> : <div className="mt-10 flex justify-center"><Spinner /></div>}</Shell>
   const selectedCount = d.interested.filter(p => p.selectedAt).length
+  const compatible = d.compatible ?? []
+  const requestUrl = 'https://mapadomapa.netlify.app/area/pedidos#pedido-' + d.id
+  const serviceText = `Serviço: ${d.title}\nDescrição: ${d.description}\nLocal: ${d.neighborhood}, ${d.region}\nPrazo: ${urgencyLabel(d.urgency)}${d.periodNote ? ' · '+d.periodNote : ''}`
+  const inviteMessage = (name: string | null) => personalize(`Olá, [nome]! Aqui é a equipe do Mapa do Mapa. Temos um pedido compatível com seu perfil.\n\n${serviceText}\n\nVocê tem disponibilidade para atender? Responda esta mensagem ou acesse: ${requestUrl}\n\nA conexão com o cliente será feita após confirmação.`, name)
+  const transferMessage = (name: string | null) => personalize(`Olá, [nome]! Você foi selecionado para este pedido:\n\n${serviceText}\n\nCliente: ${d.client.name}\nTelefone: ${d.client.phone}\nPreferência de contato: ${d.contactPreference ?? 'confirme com o cliente'}.\n\nEntre em contato para combinar o orçamento.`, name)
   const clientMsg = personalize(`Olá, [nome]! Aqui é a equipe ${d.origin === 'De fora a fora' ? 'do De fora a fora' : 'do Mapa do Mapa'}. Sobre o seu pedido "${d.title}": ${selectedCount ? 'temos profissionais selecionados para conversar com você.' : 'recebemos sua solicitação e estamos verificando a disponibilidade.'}`, d.client.name)
   return (
     <Shell title={d.title} back="/admin/pedidos">
@@ -208,6 +214,26 @@ function DetailPage() {
         <p className="mt-3 text-[13px] text-muted">{d.consent && d.consentAt ? `Autorização do cliente confirmada em ${fmt(d.consentAt)}.` : 'Autorização do cliente ainda não confirmada.'}</p>
       </section>
 
+      {d.status === 'published' && selectedCount < 2 && (
+        <section className="mt-4 rounded-3xl border-2 border-graphite bg-white p-5" data-testid="urgent-contact">
+          <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Clock size={20} className="text-[#b45309]" aria-hidden="true" /><h2 className="text-[18px] font-bold">Acionar profissionais</h2></div><button type="button" disabled={busy} onClick={() => void load()} aria-label="Atualizar interessados e profissionais" className="grid size-11 shrink-0 place-items-center rounded-xl border border-line"><RefreshCw size={18} aria-hidden="true" /></button></div>
+          {d.interested.length === 0 && <div className="mt-3 rounded-2xl bg-[#fff4db] p-3 text-[14px] font-semibold text-[#7a5a00]">Ninguém respondeu ainda. Acione os profissionais compatíveis pelo WhatsApp.</div>}
+          <p className="mt-3 text-[14px] text-muted">Profissionais aprovados da mesma profissão e região que ainda não responderam. O WhatsApp abre com todos os detalhes do serviço, sem os dados privados do cliente.</p>
+          <p className="mt-3 text-[15px] font-bold">{compatible.length} profissional(is) para convite</p>
+          {compatible.length === 0 && <p className="mt-2 text-[14px] text-muted">Não há outros profissionais compatíveis para acionar.</p>}
+          <ul className="mt-2 divide-y divide-line">{compatible.map(p => <li key={p.id} className="py-3">
+            <p className="text-[16px] font-semibold">{p.name ?? 'Sem nome'}</p>
+            <p className="text-[14px] text-muted">{p.phone ?? 'Sem telefone'}{p.phoneVerified ? ' · verificado' : ' · não verificado'}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {p.whatsapp && <a href={waUrl(p.whatsapp, inviteMessage(p.name))} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#25d366] px-4 font-bold text-graphite"><MessageCircle size={18} aria-hidden="true" /> Enviar pedido</a>}
+              <Link to={`/admin/profissionais/${p.id}`} className="inline-flex min-h-12 items-center rounded-xl border border-line px-4 text-[14px] font-semibold">Ver ficha</Link>
+              {p.whatsapp && <button type="button" disabled={busy} onClick={() => { if (window.confirm('Este profissional confirmou que tem interesse pelo WhatsApp? A seleção ocupa uma das duas vagas e permite o repasse do contato.')) void act(() => api.post('/admin/requests/'+d.id+'/select-confirmed/'+p.id)) }} className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-graphite px-4 text-[14px] font-semibold disabled:opacity-50">Confirmou pelo WhatsApp · Selecionar</button>}
+            </div>
+          </li>)}</ul>
+          <p className="mt-3 text-[12px] leading-snug text-muted">O envio é manual, individual e não confirma uma vaga. Se o técnico aceitar pelo WhatsApp, confirme aqui para liberar o repasse ao cliente. Limite: dois selecionados.</p>
+        </section>
+      )}
+
       {d.status !== 'draft' && (
         <section className="mt-4 rounded-3xl bg-white p-5" data-testid="interested">
           <h2 className="text-[17px] font-bold">Profissionais interessados ({d.interested.length})</h2>
@@ -222,8 +248,8 @@ function DetailPage() {
               {p.selectedAt && <p className="mt-1 text-[13px] font-semibold text-[#2b8a00]">Selecionado para conexão · {fmt(p.selectedAt)}</p>}
               <div className="mt-2 flex flex-wrap gap-2">
                 {!p.selectedAt && d.status === 'published' && <button type="button" disabled={busy || selectedCount >= 2} onClick={() => { if (window.confirm('Selecionar este profissional para uma das duas vagas? A escolha é definitiva.')) void act(() => api.post('/admin/requests/'+d.id+'/select/'+p.id)) }} className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-[14px] font-semibold disabled:opacity-50">Selecionar</button>}
-                {p.selectedAt && p.whatsapp && d.consent && <a href={waUrl(p.whatsapp, personalize(`Olá, [nome]! Você foi selecionado para o pedido "${d.title}". O cliente autorizou o contato: ${d.client.name}, ${d.client.phone}. Preferência de contato: ${d.contactPreference ?? 'confirme com o cliente'}. Entre em contato para combinar o orçamento.`, p.name))} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-full bg-lime px-4 text-[14px] font-semibold">Repassar contato</a>}
-                {p.whatsapp && <a href={waUrl(p.whatsapp, personalize(`Olá, [nome]! Aqui é a equipe do Mapa do Mapa. Recebemos um pedido compatível com você: "${d.title}" (${d.neighborhood}, ${d.region}). Você tem disponibilidade para atender?`, p.name))} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25d366] px-4 text-[14px] font-semibold text-graphite"><MessageCircle size={16} aria-hidden="true" /> WhatsApp</a>}
+                {p.selectedAt && p.whatsapp && d.consent && <a href={waUrl(p.whatsapp, transferMessage(p.name))} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-full bg-lime px-4 text-[14px] font-semibold">Repassar contato</a>}
+                {p.whatsapp && <a href={waUrl(p.whatsapp, inviteMessage(p.name))} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25d366] px-4 text-[14px] font-semibold text-graphite"><MessageCircle size={16} aria-hidden="true" /> WhatsApp</a>}
                 <Link to={`/admin/profissionais/${p.id}`} className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-[14px] font-semibold">Abrir ficha</Link>
               </div>
             </li>))}</ul>
