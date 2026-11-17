@@ -9,6 +9,8 @@ import SubmitButton from '../components/ui/SubmitButton'
 import Button from '../components/Button'
 import Choice from '../pro/Choice'
 import type { Catalog, ProState } from '../pro/types'
+import type { Me } from '../area/types'
+import { STATUS_HINT } from '../area/types'
 import { CATEGORIES } from '../data/categories'
 import { api, ApiError } from '../lib/api'
 
@@ -17,8 +19,7 @@ type Work = {
   weekdays: string[]; periods: string[]; emergency: boolean
   ownTools: string; vehicle: string; structure: string
 }
-// 4 passos do cadastro completo: 1 conta · 2 profissões e regiões · 3 trabalho · 4 perguntas e envio
-const MACRO = [2, 2, 3, 4, 4]
+// Conta + cinco etapas profissionais, com o progresso real de 1 a 6.
 const TITLES = ['Suas profissões', 'Onde você atende', 'Seu trabalho', 'Perguntas técnicas', 'Revisar e enviar']
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
 
@@ -39,6 +40,8 @@ export default function Profissional() {
   const [cat, setCat] = useState<Catalog | null>(null)
   const [state, setState] = useState<ProState | null>(null)
   const [step, setStep] = useState(1)
+  const [identity, setIdentity] = useState<Pick<Me, 'fullName' | 'bio' | 'services' | 'extraInfo'> | null>(null)
+  const [fullName, setFullName] = useState('')
   const [prof, setProf] = useState<string[]>([])
   const [reg, setReg] = useState<string[]>([])
   const [work, setWork] = useState<Work>({ exp: {}, weekdays: [], periods: [], emergency: false, ownTools: '', vehicle: '', structure: '' })
@@ -53,8 +56,10 @@ export default function Profissional() {
   }, [])
 
   useEffect(() => {
-    Promise.all([api.get<Catalog>('/pro/catalog'), api.get<ProState>('/pro/profile')])
-      .then(([c, s]) => { setCat(c); apply(s); setStep(s.locked ? 5 : s.nextStep) })
+    Promise.all([api.get<Catalog>('/pro/catalog'), api.get<ProState>('/pro/profile'), api.get<Me>('/pro/me')])
+      .then(([c, s, me]) => {
+        setCat(c); apply(s); setIdentity(me); setFullName(me.fullName ?? ''); setStep(s.locked ? 5 : s.nextStep)
+      })
       .catch(() => setLoadError(true))
   }, [apply])
 
@@ -63,6 +68,7 @@ export default function Profissional() {
     try { await fn() } catch (err) {
       if (err instanceof ApiError && err.code === 'profile_incomplete') { setError(err.message); setStep(Number(err.data.nextStep) || 1) }
       else setError(err instanceof ApiError ? err.message : 'Algo deu errado. Tente de novo em instantes.')
+      window.scrollTo(0, 0)
     } finally { setBusy(false) }
   }
   const put = async (path: string, body: unknown): Promise<ProState> => {
@@ -71,10 +77,10 @@ export default function Profissional() {
   const go = (n: number) => { setError(null); setStep(n); window.scrollTo(0, 0) }
 
   if (loadError) return <Shell><Alert tone="error">Não foi possível carregar o seu cadastro. Confira a internet e <Link to="/profissional" reloadDocument className="font-semibold underline">tente de novo</Link>.</Alert></Shell>
-  if (!cat || !state) return <Spinner fullPage />
+  if (!cat || !state || !identity) return <Spinner fullPage />
 
   const maxP = cat.limits.professions, maxR = cat.limits.regions
-  const workOk = prof.length > 0 && prof.every((s) => work.exp[s]?.years !== '' && work.exp[s]?.years !== undefined && Number(work.exp[s].years) >= 0 && Number(work.exp[s].years) <= 60 && work.exp[s].level) &&
+  const workOk = prof.length > 0 && prof.every((s) => work.exp[s]?.years !== '' && work.exp[s]?.years !== undefined && Number.isInteger(Number(work.exp[s].years)) && Number(work.exp[s].years) >= 0 && Number(work.exp[s].years) <= 60 && work.exp[s].level) &&
     work.weekdays.length > 0 && work.periods.length > 0 && work.ownTools && work.vehicle && work.structure
 
   // ----- Passo 1 -----
@@ -115,7 +121,7 @@ export default function Profissional() {
       {state.professions.map((p) => (
         <Block key={p.slug} title={p.name}>
           <label htmlFor={`y-${p.slug}`} className="text-[15px] font-semibold">Há quantos anos você trabalha com isso?</label>
-          <input id={`y-${p.slug}`} type="number" inputMode="numeric" min={0} max={60} placeholder="Ex.: 5" value={work.exp[p.slug]?.years ?? ''}
+          <input id={`y-${p.slug}`} type="number" inputMode="numeric" min={0} max={60} step={1} placeholder="Ex.: 5" value={work.exp[p.slug]?.years ?? ''}
             onChange={(e) => upd({ exp: { ...work.exp, [p.slug]: { level: work.exp[p.slug]?.level ?? '', years: e.target.value } } })}
             className="mt-2 block min-h-13 w-full rounded-2xl border border-line bg-white px-4 text-[17px] focus:outline-2 focus:outline-offset-2 focus:outline-graphite" />
           <p className="mt-4 text-[15px] font-semibold">Seu nível de conhecimento</p>
@@ -140,7 +146,16 @@ export default function Profissional() {
     </>
   )
 
+  const nameOk = fullName.trim().length >= 3 && /\p{L}{2,}/u.test(fullName)
+  const saveName = async () => {
+    if (fullName.trim() !== (identity.fullName ?? '').trim()) {
+      const me = await api.put<Me>('/pro/me', { fullName: fullName.trim(), bio: identity.bio, services: identity.services, extraInfo: identity.extraInfo })
+      setIdentity(me)
+    }
+  }
   const submit = () => run(async () => {
+    if (!nameOk) { setError('Informe seu nome completo antes de enviar.'); return }
+    await saveName()
     await api.post('/pro/submit')
     apply(await api.get<ProState>('/pro/profile'))
     setStep(5)
@@ -151,14 +166,19 @@ export default function Profissional() {
   const s5 = state.locked ? (
     <div className="text-center">
       <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-lime text-graphite"><CheckCircle2 size={30} strokeWidth={2} aria-hidden="true" /></span>
-      <h2 className="mt-4 text-[24px] font-bold tracking-tight">Cadastro enviado!</h2>
-      <p className="mt-2 text-[16px] leading-relaxed text-muted">{state.approvalNote}</p>
-      <p className="mt-2 text-[14px] text-muted">Status: <strong className="text-graphite">em análise</strong>. Você não precisa fazer mais nada agora.</p>
+      <h2 className="mt-4 text-[24px] font-bold tracking-tight">{state.profile.reviewStatus === 'approved' ? 'Cadastro aprovado!' : state.profile.reviewStatus === 'pending_review' ? 'Cadastro enviado!' : 'Situação do seu cadastro'}</h2>
+      <p className="mt-2 text-[16px] leading-relaxed text-muted">{STATUS_HINT[state.profile.reviewStatus] ?? state.approvalNote}</p>
+      {state.profile.reviewStatus === 'pending_review' && <p className="mt-2 text-[14px] text-muted">Acompanhe a análise em sua área. Você já pode complementar seu perfil com foto e apresentação.</p>}
       <div className="mt-6"><Button to="/area" variant="dark" fullWidth>Ir para minha área</Button></div>
     </div>
   ) : (
     <>
       <Lead title="Confira e envie" text="Revise suas informações. Depois de enviar, você ainda pode atualizar nome, foto, apresentação, experiência e regiões em Meu Perfil enquanto analisamos. Para trocar de profissão ou de respostas, fale com a equipe." />
+      <Block title="Identificação">
+        <label htmlFor="full-name" className="text-[15px] font-semibold">Seu nome completo *</label>
+        <input id="full-name" data-clarity-mask="true" autoComplete="name" maxLength={80} value={fullName} onChange={e => setFullName(e.target.value)} className="mt-2 block min-h-13 w-full rounded-2xl border border-line bg-white px-4 text-[17px]" placeholder="Como você se chama?" />
+        <p className="mt-2 text-sm text-muted">Assim a equipe consegue identificar você durante a análise.</p>
+      </Block>
       <Block title="Profissões">{state.professions.map((p) => <p key={p.slug} className="text-[16px]">{p.name} · {p.experienceYears} anos · {cat.options.levels.find((l) => l.id === p.selfLevel)?.label}</p>)}</Block>
       <Block title="Regiões"><p className="text-[16px]">{state.regions.map(nameOf).join(' e ')}</p></Block>
       <Block title="Perguntas técnicas">{state.professions.map((p) => <p key={p.slug} className="text-[16px]">{p.name}: {state.progress.assessment[p.slug].answered} de {state.progress.assessment[p.slug].total} respondidas</p>)}</Block>
@@ -167,19 +187,26 @@ export default function Profissional() {
   )
 
   // ----- Ações por passo -----
-  const next = () => run(async () => {
-    if (step === 1) { await put('/pro/professions', { professions: prof }); go(2) }
-    else if (step === 2) { await put('/pro/regions', { regions: reg }); go(3) }
+  const saveStep = async () => {
+    if (step === 1) { await put('/pro/professions', { professions: prof }) }
+    else if (step === 2) { await put('/pro/regions', { regions: reg }) }
     else if (step === 3) {
       await put('/pro/work', {
         experience: Object.fromEntries(prof.map((s) => [s, { years: Number(work.exp[s]?.years), level: work.exp[s]?.level }])),
         availability: { weekdays: work.weekdays, periods: work.periods, emergency: work.emergency },
         ownTools: work.ownTools, vehicle: work.vehicle, workStructure: work.structure,
       })
-      go(4)
     }
-  })
+  }
+  const next = () => run(async () => { await saveStep(); go(step + 1) })
   const canNext = step === 1 ? prof.length >= 1 && prof.length <= maxP : step === 2 ? reg.length >= 1 && reg.length <= maxR : step === 3 ? Boolean(workOk) : false
+
+  const later = () => run(async () => {
+    if (step <= 3 && canNext) await saveStep()
+    else if (step === 5 && nameOk) await saveName()
+    else if (!window.confirm('Esta etapa ainda está incompleta. As etapas anteriores já estão salvas. Sair agora?')) return
+    navigate('/area')
+  })
 
   return (
     <Shell step={step} locked={state.locked}>
@@ -190,11 +217,11 @@ export default function Profissional() {
       {(step <= 3 || (step === 5 && !state.locked)) && (
         <div className="sticky bottom-0 -mx-5 mt-8 border-t border-line bg-ice px-5 py-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
           <div className="mx-auto flex max-w-lg gap-3">
-            {step > 1 && <SubmitButton type="button" variant="ghost" className="w-auto border border-line" onClick={() => go(step - 1)}><ArrowLeft size={20} aria-hidden="true" /> Voltar</SubmitButton>}
+            {step > 1 && <SubmitButton type="button" variant="ghost" className="w-auto border border-line" disabled={busy} onClick={() => go(step - 1)}><ArrowLeft size={20} aria-hidden="true" /> Voltar</SubmitButton>}
             {step <= 3 ? <SubmitButton type="button" loading={busy} disabled={!canNext} onClick={next}>Continuar</SubmitButton>
-              : <SubmitButton type="button" loading={busy} onClick={submit}>Enviar para análise</SubmitButton>}
+              : <SubmitButton type="button" loading={busy} disabled={!nameOk} onClick={submit}>Enviar para análise</SubmitButton>}
           </div>
-          <p className="mx-auto mt-2 max-w-lg text-center"><button type="button" className="py-3 text-[14px] font-medium text-muted underline underline-offset-4" onClick={() => navigate('/area')}>Salvar e continuar depois</button></p>
+          <p className="mx-auto mt-2 max-w-lg text-center"><button type="button" className="py-3 text-[14px] font-medium text-muted underline underline-offset-4" disabled={busy} onClick={later}>{step === 5 && !nameOk || step <= 3 && !canNext ? 'Sair e continuar depois' : 'Salvar e continuar depois'}</button></p>
         </div>
       )}
     </Shell>
@@ -209,9 +236,9 @@ function Shell({ children, step, locked }: { children: React.ReactNode; step?: n
         <div className="mx-auto max-w-lg px-5 pb-6 pt-6 md:pt-10">
           {step && !locked && (
             <div className="mb-6">
-              <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Passo {MACRO[step - 1]} de 4 · {TITLES[step - 1]}</p>
-              <div className="mt-3 flex gap-1.5" role="progressbar" aria-valuemin={1} aria-valuemax={5} aria-valuenow={step}>
-                {[1, 2, 3, 4, 5].map((n) => <span key={n} className={`h-1.5 flex-1 rounded-full ${n <= step ? 'bg-graphite' : 'bg-line'}`} />)}
+              <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Etapa {step + 1} de 6 · {TITLES[step - 1]}</p>
+              <div className="mt-3 flex gap-1.5" role="progressbar" aria-valuemin={1} aria-label="Progresso do cadastro" aria-valuemax={6} aria-valuenow={step + 1}>
+                {[1, 2, 3, 4, 5, 6].map((n) => <span key={n} className={`h-1.5 flex-1 rounded-full ${n <= step + 1 ? 'bg-graphite' : 'bg-line'}`} />)}
               </div>
             </div>
           )}
@@ -237,6 +264,7 @@ const Radios = ({ list, value, onPick }: { list: { id: string; label: string }[]
 
 // ----- Passo 4: uma pergunta por tela, salvamento automático -----
 function Assessment({ cat, state, setState, onBack, onDone }: { cat: Catalog; state: ProState; setState: (s: ProState) => void; onBack: () => void; onDone: () => void }) {
+  const navigate = useNavigate()
   const flat = useMemo(() => state.professions.flatMap((p) => (state.questionnaires[p.slug] ?? []).map((q) => ({ p, q }))), [state.professions, state.questionnaires])
   const isDone = (slug: string, q: ProState['questionnaires'][string][number]) => {
     const a = state.answers[slug]?.[q.id]
@@ -261,6 +289,14 @@ function Assessment({ cat, state, setState, onBack, onDone }: { cat: Catalog; st
   const advance = () => (last ? onDone() : (setI(i + 1), window.scrollTo(0, 0)))
   const chosen = state.answers[cur.p.slug]?.[cur.q.id]?.choice
   const tooShort = cur.q.kind === 'open' && text.trim().length < cat.limits.openMin
+  const leave = async () => {
+    if (cur.q.kind === 'open' && text.trim() !== (state.answers[cur.p.slug]?.[cur.q.id]?.text ?? '').trim()) {
+      if (tooShort) {
+        if (!window.confirm('A resposta atual ainda não pode ser salva. Sair e manter as anteriores?')) return
+      } else if (!(await save({ questionId: cur.q.id, text: text.trim() }))) return
+    }
+    navigate('/area')
+  }
 
   return (
     <>
@@ -269,11 +305,11 @@ function Assessment({ cat, state, setState, onBack, onDone }: { cat: Catalog; st
       {err && <div className="mt-4"><Alert tone="error">{err}</Alert></div>}
       <div className="mt-5 grid gap-3">
         {cur.q.kind === 'choice' ? cur.q.options.map((o) => (
-          <Choice key={o.id} selected={chosen === o.id} onClick={() => void save({ questionId: cur.q.id, choice: o.id })}>{o.text}</Choice>
+          <Choice key={o.id} selected={chosen === o.id} disabled={busy} onClick={() => void save({ questionId: cur.q.id, choice: o.id })}>{o.text}</Choice>
         )) : (
           <div>
             <p className="mb-2 text-[14px] text-muted">{cur.q.hint}</p>
-            <textarea aria-label="Sua resposta" rows={7} maxLength={cat.limits.openMax} value={text} onChange={(e) => setText(e.target.value)}
+            <textarea aria-label="Sua resposta" rows={7} disabled={busy} maxLength={cat.limits.openMax} value={text} onChange={(e) => setText(e.target.value)}
               className="block w-full rounded-2xl border border-line bg-white p-4 text-[17px] leading-relaxed focus:outline-2 focus:outline-offset-2 focus:outline-graphite" placeholder="Escreva com suas palavras…" />
             <p className="mt-1 flex justify-between text-[13px] text-muted"><span>{tooShort ? `Escreva pelo menos ${cat.limits.openMin} caracteres` : 'Ok'}</span><span>{text.length}/{cat.limits.openMax}</span></p>
           </div>
@@ -281,13 +317,14 @@ function Assessment({ cat, state, setState, onBack, onDone }: { cat: Catalog; st
       </div>
       <div className="sticky bottom-0 -mx-5 mt-8 border-t border-line bg-ice px-5 py-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <div className="mx-auto flex max-w-lg gap-3">
-          <SubmitButton type="button" variant="ghost" className="w-auto border border-line" onClick={() => (i === 0 ? onBack() : setI(i - 1))}><ArrowLeft size={20} aria-hidden="true" /> Voltar</SubmitButton>
+          <SubmitButton type="button" variant="ghost" className="w-auto border border-line" disabled={busy} onClick={() => (i === 0 ? onBack() : (setI(i - 1), window.scrollTo(0, 0)))}><ArrowLeft size={20} aria-hidden="true" /> Voltar</SubmitButton>
           <SubmitButton type="button" loading={busy} disabled={cur.q.kind === 'choice' ? !answered : tooShort}
             onClick={async () => { if (cur.q.kind === 'open') { if (!(await save({ questionId: cur.q.id, text: text.trim() }))) return } advance() }}>
             {last ? 'Revisar' : 'Próxima'}
           </SubmitButton>
         </div>
-        <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-muted">Suas respostas são salvas automaticamente.</p>
+        <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-muted">As alternativas são salvas na escolha; respostas escritas, ao avançar.</p>
+        <p className="mt-2 text-center"><button type="button" disabled={busy} onClick={() => void leave()} className="inline-block py-2 text-sm font-medium underline">Salvar e continuar depois</button></p>
       </div>
     </>
   )

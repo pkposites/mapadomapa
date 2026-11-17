@@ -22,7 +22,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2
 /** Próxima ação recomendada, a partir da situação real do cadastro. */
 function nextAction(h: Home): { label: string; to: string; why: string } {
   if(h.status==='master') return {label:'Abrir painel administrativo',to:'/admin',why:'Gerencie a plataforma e confira todas as experiências.'}
-  if (!h.name) return { label: 'Informar meu nome', to: '/area/perfil', why: 'Precisamos do seu nome para identificar o seu perfil.' }
+  if (!h.name && h.status !== 'not_submitted' && h.status !== 'needs_changes') return { label: 'Informar meu nome', to: '/area/perfil', why: 'Precisamos do seu nome para identificar o seu perfil.' }
   switch (h.status) {
     case 'not_submitted': return { label: 'Continuar meu cadastro', to: '/profissional', why: 'Falta enviar o cadastro para a análise da equipe.' }
     case 'needs_changes': return { label: 'Ver ajustes e reenviar', to: '/profissional', why: 'A equipe pediu ajustes. Leia a orientação e envie de novo.' }

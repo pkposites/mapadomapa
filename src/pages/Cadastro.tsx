@@ -73,6 +73,14 @@ export default function Cadastro() {
     setCaptchaReset((n) => n + 1) // o token é de uso único
   }
 
+  const finishAccount = async () => {
+    await refresh()
+    const emailState = await api.get<{ configured: boolean; email: string | null; verified: boolean }>('/auth/email').catch(() => null)
+    if (emailState?.configured && emailState.email && !emailState.verified) {
+      navigate('/area/email', { replace: true, state: { from: '/profissional' } })
+    } else navigate('/profissional', { replace: true })
+  }
+
   const submitForm = async (ev: FormEvent) => {
     ev.preventDefault()
     const next: Errors = {}
@@ -82,13 +90,16 @@ export default function Cadastro() {
     if (!accepted) next.terms = 'Marque que você leu e aceita para continuar.'
     if (captchaMode && !captcha) next.captcha = captchaMode === 'pow' ? 'Verificando a segurança… aguarde um instante e toque em Continuar de novo.' : CAPTCHA_MSG
     setErrors(next)
-    if (Object.keys(next).length) return
+    if (Object.keys(next).length) {
+      const first = Object.keys(next)[0]
+      document.getElementById(first)?.focus()
+      return
+    }
     setBusy(true)
     try {
       const r = await api.post<Registered | { ok: true; mode: 'admin' }>('/auth/register', { phone, email, password, acceptTerms: true, captchaToken: captcha, contato_extra: hp })
       if ('mode' in r) { // MVP: conta criada e já logada; o celular será verificado pela equipe
-        await refresh()
-        navigate('/area/email', { replace: true, state:{from:'/profissional'} })
+        await finishAccount()
         return
       }
       startCooldown(r.resendIn)
@@ -117,8 +128,7 @@ export default function Cadastro() {
       })
       // Mesmo event_name + event_id do servidor => a Meta conta UMA conversão (deduplicação).
       if (consent && r.tracking) trackBrowserEvent(r.tracking.eventName, { content_name: 'pre_cadastro' }, r.tracking.eventId)
-      await refresh()
-      navigate('/area', { replace: true })
+      await finishAccount()
     } catch (err) {
       fail(err, 'code')
     } finally {
@@ -162,7 +172,7 @@ export default function Cadastro() {
   if (step === 'code') {
     return (
       <AuthShell
-        eyebrow="Passo 2 de 2"
+        eyebrow="Etapa 1 de 6 · Confirmação do celular"
         title="Confirme seu celular"
         subtitle={<>Enviamos um SMS com 6 números para <strong className="font-semibold text-graphite">{phone}</strong>. O código vale por 10 minutos.</>}
         below={
@@ -201,11 +211,11 @@ export default function Cadastro() {
       <form onSubmit={submitForm} noValidate className="space-y-5">
         <p className="rounded-2xl bg-ice p-3 text-[13px] leading-snug text-muted" data-testid="signup-transparency">Cadastro gratuito. A aprovação depende de análise da equipe e o cadastro <strong className="font-semibold text-graphite">não garante oportunidades, contratação nem rendimento</strong>. Condições comerciais futuras serão informadas antes de qualquer cobrança.</p>
         <div data-testid="signup-steps" aria-label="Passos do cadastro">
-          <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Passo 1 de 4 · Crie sua conta</p>
-          <div className="mt-2 grid grid-cols-4 gap-1.5" aria-hidden="true">
-            {[0, 1, 2, 3].map((i) => <span key={i} className={`h-1.5 rounded-full ${i === 0 ? 'bg-graphite' : 'bg-line'}`} />)}
+          <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">Etapa 1 de 6 · Crie sua conta</p>
+          <div className="mt-2 grid grid-cols-6 gap-1.5" aria-hidden="true">
+            {[0, 1, 2, 3, 4, 5].map((i) => <span key={i} className={`h-1.5 rounded-full ${i === 0 ? 'bg-graphite' : 'bg-line'}`} />)}
           </div>
-          <p className="mt-2 text-[14px] leading-snug text-muted">Depois você escolhe até 2 profissões e 2 regiões, conta sua experiência e responde a 3 perguntas rápidas por profissão.</p>
+          <p className="mt-2 text-[14px] leading-snug text-muted">Depois você escolhe até 2 profissões e 2 regiões, informa sua experiência, responde às perguntas técnicas e envia para análise. Você poderá retomar as etapas salvas.</p>
         </div>
         {errors.form && (
           <Alert tone="error">
@@ -214,7 +224,7 @@ export default function Cadastro() {
           </Alert>
         )}
         <PhoneField id="phone" label="Seu celular" hint={vmode === 'admin' ? 'Usamos para a equipe falar com você.' : 'Vamos enviar um código por SMS para confirmar.'} value={phone} onChange={setPhone} error={errors.phone} autoFocus />
-        <div><label htmlFor="email" className="block text-[15px] font-semibold">Seu e-mail *</label><input id="email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required maxLength={254} className="mt-2 block w-full rounded-2xl border border-line px-4 py-3 text-[16px]" placeholder="nome@email.com"/><p className="mt-1 text-[13px] text-muted">Para avisos, pagamentos e segurança da conta.</p>{errors.email&&<p role="alert" className="mt-1 text-[13px] text-red-700">{errors.email}</p>}</div>
+        <div><label htmlFor="email" className="block text-[15px] font-semibold">Seu e-mail *</label><input id="email" data-clarity-mask="true" type="email" inputMode="email" autoComplete="email" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? 'email-error' : undefined} value={email} onChange={e=>setEmail(e.target.value)} required maxLength={254} className="mt-2 block w-full rounded-2xl border border-line px-4 py-3 text-[16px]" placeholder="nome@email.com"/><p className="mt-1 text-[13px] text-muted">Para avisos, pagamentos e segurança da conta.</p>{errors.email&&<p id="email-error" role="alert" className="mt-1 text-[13px] text-red-700">{errors.email}</p>}</div>
         <PasswordField id="password" label="Crie uma senha" hint="Pelo menos 8 caracteres." value={password} onChange={setPassword} error={errors.password} autoComplete="new-password" />
 
         <div>
