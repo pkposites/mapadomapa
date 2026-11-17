@@ -91,7 +91,7 @@ export default function Perfil() {
           <input id="fullName" autoComplete="name" maxLength={80} value={f.fullName} onChange={(e) => setF({ ...f, fullName: e.target.value })} className={`${field} min-h-13`} disabled={blocked} />
           <p className={`${label} mt-4`}>Celular</p>
           <p className="mt-1 text-[16px]" data-testid="my-phone">{phone?.phone} <span className="ml-2 rounded-full bg-ice px-2.5 py-1 text-[13px] text-muted">{phone?.verified ? 'verificado' : 'não verificado'}</span></p>
-          <p className="mt-1 text-[13px] leading-snug text-muted">O celular só pode ser alterado pela equipe. {phone?.verified ? '' : 'A verificação é feita manualmente pela equipe durante a análise do cadastro; se tiver dúvidas, escreva em Mensagens.'}</p>
+          <p className="mt-1 text-[13px] leading-snug text-muted">O celular só pode ser alterado pela equipe. {user?.isAdmin||phone?.verified ? '' : 'A verificação é feita manualmente pela equipe durante a análise do cadastro; se tiver dúvidas, escreva em Mensagens.'}</p>
           <label htmlFor="bio" className={`${label} mt-4`}>Apresentação profissional</label>
           <textarea id="bio" rows={4} maxLength={600} value={f.bio} onChange={(e) => setF({ ...f, bio: e.target.value })} className={field} disabled={blocked} placeholder="Conte quem você é e como trabalha." />
           <label htmlFor="services" className={`${label} mt-4`}>Serviços que você realiza</label>
@@ -105,7 +105,7 @@ export default function Perfil() {
         <section className={box}>
           <h2 className="text-[18px] font-bold">Profissões</h2>
           <ul className="mt-3 space-y-1">{me.professions.map((p) => <li key={p.slug} className="text-[16px] font-semibold">• {p.name}</li>)}{me.professions.length === 0 && <li className="text-muted">Nenhuma escolhida ainda.</li>}</ul>
-          {me.canEditProfessions
+          {me.status==='master'? <p className="mt-3 text-[14px] text-muted">Conta administrativa: não é necessário cadastrar profissões para ter acesso.</p>:me.canEditProfessions
             ? <p className="mt-3 text-[15px]"><Link to="/profissional" className="font-semibold underline decoration-lime decoration-2 underline-offset-4">Editar no cadastro</Link></p>
             : <p className="mt-3 text-[14px] leading-snug text-muted">Para trocar de profissão, a equipe precisa reavaliar seu cadastro. <Link className="font-semibold text-graphite underline" to="/area/mensagens" state={{ prefill: 'Quero solicitar a troca das minhas profissões.' }}>Solicitar alteração</Link></p>}
         </section>

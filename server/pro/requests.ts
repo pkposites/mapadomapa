@@ -12,21 +12,21 @@ const label = (u: string) => URGENCY.find((x) => x.id === u)?.label ?? u
  * Oportunidades para o PROFISSIONAL. Só entram pedidos PUBLICADOS da profissão e da região do profissional,
  * e só para cadastro APROVADO. Nome, telefone e qualquer dado do cliente nunca saem daqui.
  */
-export async function listOpportunities(userId: string) {
+export async function listOpportunities(userId: string, master = false) {
   const me = (await query<Row>('SELECT review_status FROM professional_profiles WHERE user_id = $1', [userId]))[0]
-  if (me?.review_status !== 'approved') return { allowed: false, items: [] as unknown[] }
-  const recharge = await getRecharge(userId)
+  if (!master && me?.review_status !== 'approved') return { allowed: false, items: [] as unknown[] }
+  const recharge = master?undefined:await getRecharge(userId)
   const rows = await query<Row>(
     `SELECT r.id, r.title, r.description, r.neighborhood, r.urgency, r.period_note, r.published_at, p.name AS profession, g.name AS region,
             EXISTS (SELECT 1 FROM service_request_interests i WHERE i.request_id = r.id AND i.user_id = $1) AS interested
      FROM service_requests r JOIN professions p ON p.id = r.profession_id JOIN service_regions g ON g.id = r.region_id
      WHERE r.status = 'published'
-       AND ($2::boolean OR EXISTS (SELECT 1 FROM service_request_interests old WHERE old.request_id=r.id AND old.user_id=$1))
+       AND ($3::boolean OR (($2::boolean OR EXISTS (SELECT 1 FROM service_request_interests old WHERE old.request_id=r.id AND old.user_id=$1))
        AND EXISTS (SELECT 1 FROM profile_professions pp WHERE pp.user_id = $1 AND pp.profession_id = r.profession_id)
        AND EXISTS (SELECT 1 FROM professional_regions pr WHERE pr.user_id = $1 AND pr.region_id = r.region_id)
        AND (EXISTS (SELECT 1 FROM service_request_interests i WHERE i.request_id=r.id AND i.user_id=$1)
-         OR (SELECT count(*) FROM service_request_interests i WHERE i.request_id=r.id AND i.selected_at IS NOT NULL) < 2)
-     ORDER BY r.published_at DESC, r.id DESC LIMIT 100`, [userId,recharge.canReceive])
+         OR (SELECT count(*) FROM service_request_interests i WHERE i.request_id=r.id AND i.selected_at IS NOT NULL) < 2)))
+     ORDER BY r.published_at DESC, r.id DESC LIMIT 100`, [userId,recharge?.canReceive??true,master])
   return {
     allowed: true, recharge,
     items: rows.map((r) => ({

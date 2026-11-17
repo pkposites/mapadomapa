@@ -12,8 +12,13 @@ const bad = (code: string, message: string) => new ApiError(400, code, message)
 const clean = (v: unknown, max: number): string => (typeof v === 'string' ? v.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, max) : '')
 
 export const STATUS_LABEL: Record<string, string> = {
-  not_submitted: 'Cadastro incompleto', pending_review: 'Em análise', approved: 'Aprovado',
+  master:'Conta mestre', not_submitted: 'Cadastro incompleto', pending_review: 'Em análise', approved: 'Aprovado',
   needs_changes: 'Ajustes solicitados', rejected: 'Rejeitado', suspended: 'Suspenso',
+}
+// O papel administrativo é concedido no banco; não aprova nem altera o cadastro técnico.
+async function isMaster(userId:string):Promise<boolean>{
+  const [r]=await query<Row>("SELECT EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=$1 AND r.name='admin') AS master",[userId])
+  return Boolean(r?.master)
 }
 const firstName = (full: string | null) => (full ? full.trim().split(/\s+/)[0] : null)
 
@@ -34,7 +39,8 @@ export async function home(userId: string) {
   const hasPhoto = (await query('SELECT 1 FROM profile_photos WHERE user_id = $1', [userId])).length > 0
   const last = (await query<Row>(
     `SELECT action, notes, created_at FROM review_events WHERE user_id = $1 AND action IN ('approve','reject','request_changes','suspend','reinstate') ORDER BY created_at DESC, id DESC LIMIT 1`, [userId]))[0]
-  const status = p.review_status as string
+  const master = await isMaster(userId)
+  const status = master?'master':p.review_status as string
 
   const pendencies: { id: string; text: string; to: string; required: boolean }[] = []
   if (!p.full_name) pendencies.push({ id: 'name', text: 'Informe seu nome completo.', to: '/area/perfil', required: true })
@@ -53,11 +59,11 @@ export async function home(userId: string) {
     status, statusLabel: STATUS_LABEL[status] ?? status,
     decision: last && ['request_changes', 'reject', 'suspend'].includes(last.action) && ['needs_changes', 'rejected', 'suspended'].includes(status)
       ? { action: last.action as string, notes: last.notes as string | null, at: last.created_at } : null,
-    pendencies, unreadMessages, unreadAnnouncements,
+    pendencies:master?pendencies.filter(p=>!p.required):pendencies, unreadMessages, unreadAnnouncements,
     announcements: announcements.map((a) => ({ id: String(a.id), title: a.title as string, body: a.body as string, at: a.created_at, read: a.read as boolean })),
     hasPhoto,
     // "Perfil preparado": nome, apresentação, serviços e foto preenchidos (a jornada mostra só o que é real)
-    profilePrepared: Boolean(p.full_name && p.bio && p.services && hasPhoto), submitted: status !== 'not_submitted',
+    profilePrepared: master || Boolean(p.full_name && p.bio && p.services && hasPhoto), submitted: status !== 'not_submitted',
   }
 }
 
@@ -66,7 +72,8 @@ export async function getMe(userId: string) {
   const p = await profile(userId)
   const st = await getState(userId)
   const photo = (await query<Row>('SELECT extract(epoch from updated_at)::bigint v FROM profile_photos WHERE user_id = $1', [userId]))[0]
-  const status = p.review_status as string
+  const master = await isMaster(userId)
+  const status = master?'master':p.review_status as string
   return {
     fullName: p.full_name as string | null, bio: p.bio as string | null, services: p.services as string | null, extraInfo: p.extra_info as string | null,
     photoVersion: photo ? String(photo.v) : null,
@@ -76,13 +83,13 @@ export async function getMe(userId: string) {
     // Profissões só mudam com liberação da equipe; regiões mudam e voltam para análise se já enviado.
     canEditProfessions: ['not_submitted', 'needs_changes'].includes(status),
     regionsChangeResubmits: status === 'approved',
-    canEditRegions: ['not_submitted', 'needs_changes', 'approved', 'pending_review'].includes(status),
+    canEditRegions: master || ['not_submitted', 'needs_changes', 'approved', 'pending_review'].includes(status),
   }
 }
 
 export async function updateMe(userId: string, body: Record<string, unknown>) {
   const p = await profile(userId)
-  if (p.review_status === 'suspended' || p.review_status === 'rejected') {
+  if (!(await isMaster(userId)) && (p.review_status === 'suspended' || p.review_status === 'rejected')) {
     throw new ApiError(409, 'profile_locked', 'Seu cadastro está bloqueado para edição. Fale com a equipe pela caixa de mensagens.')
   }
   const fullName = clean(body.fullName, 80).replace(/\s+/g, ' ')
@@ -98,7 +105,7 @@ export async function updateMe(userId: string, body: Record<string, unknown>) {
 /** Experiência, disponibilidade, ferramentas, veículo e estrutura: editáveis a qualquer momento (não sensíveis). */
 export async function updateWork(userId: string, body: Record<string, unknown>) {
   const p = await profile(userId)
-  if (['suspended', 'rejected'].includes(p.review_status)) throw new ApiError(409, 'profile_locked', 'Seu cadastro está bloqueado para edição. Fale com a equipe pela caixa de mensagens.')
+  if (!(await isMaster(userId)) && ['suspended', 'rejected'].includes(p.review_status)) throw new ApiError(409, 'profile_locked', 'Seu cadastro está bloqueado para edição. Fale com a equipe pela caixa de mensagens.')
   await setWork(userId, body, { anyStatus: true })
   if (['approved', 'pending_review'].includes(p.review_status)) await event(userId, 'work_updated', 'Experiência, disponibilidade ou estrutura de trabalho atualizadas')
   return getMe(userId)
@@ -107,6 +114,7 @@ export async function updateWork(userId: string, body: Record<string, unknown>) 
 /** Região é alteração sensível: se o cadastro já foi aprovado, volta para análise e deixa de aparecer ao público. */
 export async function changeRegions(userId: string, body: Record<string, unknown>) {
   const p = await profile(userId)
+  if(await isMaster(userId)){await setRegions(userId,body,{anyStatus:true}); return getMe(userId)}
   if (['not_submitted', 'needs_changes'].includes(p.review_status)) { await setRegions(userId, body); return getMe(userId) }
   if (!['approved', 'pending_review'].includes(p.review_status)) throw new ApiError(409, 'profile_locked', 'Seu cadastro está bloqueado para edição. Fale com a equipe pela caixa de mensagens.')
   await setRegions(userId, body, { anyStatus: true })

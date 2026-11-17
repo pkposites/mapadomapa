@@ -151,9 +151,16 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (fp && method === 'PUT' && fp[2] === '/like') return json(await feed.setLike(me.userId, fp[1], (await readJson(req)).liked === true))
     if (fp && method === 'GET' && fp[2] === '/comments') return json(await feed.listComments(me.userId, fp[1]))
     if (fp && method === 'POST' && fp[2] === '/comments') return json(await feed.addComment(me.userId, fp[1], await readJson(req)))
-    if (method === 'GET' && path === '/pro/requests') return json(await preq.listOpportunities(me.userId))
+    if (method === 'GET' && path === '/pro/requests') {
+      const master=me.roles.includes('admin')
+      if(master) requireAdmin(me)
+      return json(await preq.listOpportunities(me.userId,master))
+    }
     const pi = path.match(/^\/pro\/requests\/(\d{1,15})\/interest$/)
-    if (pi && method === 'POST') return json(await preq.showInterest(me.userId, pi[1]))
+    if (pi && method === 'POST') {
+      if(me.roles.includes('admin')) throw new ApiError(403,'admin_account','A conta mestre gerencia pedidos pelo painel administrativo.')
+      return json(await preq.showInterest(me.userId, pi[1]))
+    }
     if (method === 'GET' && path === '/pro/boost') return json(await boost.getBoost(me.userId))
     if (method === 'PUT' && path === '/pro/boost') return json(await boost.setBoost(me.userId, await readJson(req)))
     if (method === 'DELETE' && path === '/pro/boost') return json(await boost.removeBoost(me.userId))

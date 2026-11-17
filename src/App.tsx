@@ -9,6 +9,7 @@ import MuralPage from './pages/area/MuralPage'
 import PostPage from './pages/area/PostPage'
 import Mensagens from './pages/area/Mensagens'
 import Pedidos from './pages/area/Pedidos'
+import Recarga from './pages/area/Recarga'
 import Admin from './pages/Admin'
 import AdminDestaque from './pages/AdminDestaque'
 import Destaque from './pages/area/Destaque'
@@ -22,7 +23,7 @@ import ConsentBanner from './components/ConsentBanner'
 import MetaRouteTracker from './components/MetaRouteTracker'
 import StagingBanner from './components/StagingBanner'
 import { SIM_MODE } from './lib/sim'
-import { AuthProvider } from './auth/AuthContext'
+import { AuthProvider, useAuth } from './auth/AuthContext'
 import { RequireAuth } from './auth/guards'
 import Cadastro from './pages/Cadastro'
 import Privacidade from './pages/Privacidade'
@@ -37,6 +38,11 @@ function ScrollManager() {
     else window.scrollTo(0, 0)
   }, [pathname, hash])
   return null
+}
+
+function ProfessionalEntry() {
+  const {user}=useAuth()
+  return user?.isAdmin?<Navigate to="/area/perfil" replace/>:<Profissional/>
 }
 
 export default function App() {
@@ -58,8 +64,9 @@ export default function App() {
         <Route path="/area/mural" element={<RequireAuth><MuralPage /></RequireAuth>} />
         <Route path="/area/perfil" element={<RequireAuth><Perfil /></RequireAuth>} />
         <Route path="/area/mensagens" element={<RequireAuth><Mensagens /></RequireAuth>} />
+        <Route path="/area/recarga" element={<RequireAuth><Recarga /></RequireAuth>} />
         <Route path="/area/pedidos" element={<RequireAuth><Pedidos /></RequireAuth>} />
-        <Route path="/profissional" element={<RequireAuth><Profissional /></RequireAuth>} />
+        <Route path="/profissional" element={<RequireAuth><ProfessionalEntry /></RequireAuth>} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/destaque" element={<AdminDestaque />} />
         <Route path="/admin/pedidos" element={<AdminPedidos />} />

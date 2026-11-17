@@ -4,6 +4,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { ArrowRight, Bell, ClipboardList, House, MessageSquare, Newspaper, UserRound } from 'lucide-react'
 import Logo from '../components/Logo'
 import { api } from '../lib/api'
+import { useAuth } from '../auth/AuthContext'
 
 const TABS = [
   { to: '/area', label: 'Início', Icon: House, end: true },
@@ -16,6 +17,7 @@ const TABS = [
 /** Moldura da Área do Profissional: barra superior escura + navegação inferior (pensada para o celular). */
 
 export default function AreaShell({ children }: { children: ReactNode }) {
+  const {user}=useAuth()
   const [unread, setUnread] = useState(0)
   const { pathname } = useLocation()
   const [recharge,setRecharge]=useState<Recharge|null>(null)
@@ -54,10 +56,10 @@ export default function AreaShell({ children }: { children: ReactNode }) {
       <main data-clarity-mask={pathname.startsWith('/area/perfil') || pathname.startsWith('/area/mensagens') ? 'true' : undefined} className="mx-auto max-w-lg px-4 pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-4">
         {pending > 0 && pathname !== '/area/pedidos' && <Link to="/area/pedidos" className="mb-5 flex items-center gap-3 rounded-3xl border-2 border-graphite bg-lime p-4 text-graphite shadow-sm">
           <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-graphite text-lime"><Bell size={24} aria-hidden="true" /></span>
-          <span className="flex-1"><span className="block text-[12px] font-bold uppercase tracking-wide">{urgent ? 'Pedido urgente disponível!' : 'Nova oportunidade!'}</span><span className="block text-[19px] font-bold leading-tight">{pending} {pending === 1 ? 'pedido para você' : 'pedidos para você'}</span><span className="block text-[13px] font-semibold">Veja os detalhes e manifeste interesse</span></span>
+          <span className="flex-1"><span className="block text-[12px] font-bold uppercase tracking-wide">{user?.isAdmin?'Painel mestre':urgent ? 'Pedido urgente disponível!' : 'Nova oportunidade!'}</span><span className="block text-[19px] font-bold leading-tight">{pending} {user?.isAdmin?(pending===1?'pedido publicado':'pedidos publicados'):pending === 1 ? 'pedido para você' : 'pedidos para você'}</span><span className="block text-[13px] font-semibold">{user?.isAdmin?'Veja e gerencie as solicitações':'Veja os detalhes e manifeste interesse'}</span></span>
           <ArrowRight size={22} className="shrink-0" aria-hidden="true" />
         </Link>}
-        {pathname==='/area' && recharge?.enabled && <div className="mb-3"><RechargeCard r={recharge}/></div>}
+        {pathname==='/area' && <div className="mb-3"><RechargeCard r={recharge} master={user?.isAdmin}/></div>}
         {children}</main>
       <nav aria-label="Área do profissional" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white shadow-sm pb-[env(safe-area-inset-bottom)]">
         <ul className="mx-auto grid max-w-lg grid-cols-5">

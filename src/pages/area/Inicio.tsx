@@ -21,6 +21,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2
 
 /** Próxima ação recomendada, a partir da situação real do cadastro. */
 function nextAction(h: Home): { label: string; to: string; why: string } {
+  if(h.status==='master') return {label:'Abrir painel administrativo',to:'/admin',why:'Gerencie a plataforma e confira todas as experiências.'}
   if (!h.name) return { label: 'Informar meu nome', to: '/area/perfil', why: 'Precisamos do seu nome para identificar o seu perfil.' }
   switch (h.status) {
     case 'not_submitted': return { label: 'Continuar meu cadastro', to: '/profissional', why: 'Falta enviar o cadastro para a análise da equipe.' }
@@ -70,7 +71,7 @@ export default function Inicio() {
             </div>
             <p className="mt-2 text-[14px] leading-snug text-on-dark">{STATUS_HINT[h.status]}</p>
             {h.decision?.notes && <div className="mt-3 rounded-2xl bg-white/10 p-3.5 text-[14px] leading-snug"><p className="font-semibold">Orientação da equipe</p><p className="mt-1">{h.decision.notes}</p></div>}
-            {user && !user.phoneVerified && <p className="mt-3 rounded-2xl bg-white/10 p-3.5 text-[14px] leading-snug" data-testid="phone-note"><strong>Celular ainda não verificado.</strong> A equipe verifica manualmente durante a análise do cadastro. Dúvidas? Escreva em <Link to="/area/mensagens" className="font-semibold underline">Mensagens</Link>.</p>}
+            {user && !user.isAdmin && !user.phoneVerified && <p className="mt-3 rounded-2xl bg-white/10 p-3.5 text-[14px] leading-snug" data-testid="phone-note"><strong>Celular ainda não verificado.</strong> A equipe verifica manualmente durante a análise do cadastro. Dúvidas? Escreva em <Link to="/area/mensagens" className="font-semibold underline">Mensagens</Link>.</p>}
 
             <div className="mt-4 rounded-2xl bg-lime p-4 text-graphite" data-testid="next-action">
               <p className="text-[12px] font-bold uppercase tracking-[0.1em]">Próxima ação recomendada</p>
@@ -78,7 +79,7 @@ export default function Inicio() {
               <Link to={next.to} className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-graphite px-5 font-semibold text-white">{next.label} <ArrowRight size={18} aria-hidden="true" /></Link>
             </div>
 
-            {h.status!=='approved' && <p className="mt-4 flex items-start gap-2.5 text-[14px] leading-snug text-on-dark" data-testid="launch-info">
+            {h.status!=='approved' && h.status!=='master' && <p className="mt-4 flex items-start gap-2.5 text-[14px] leading-snug text-on-dark" data-testid="launch-info">
               <CalendarDays size={18} className="mt-0.5 shrink-0 text-lime" aria-hidden="true" />
               <span><strong className="text-white">Pedidos reais previstos a partir de {SITE.requestsOpenLabel}</strong>{launch.status === 'upcoming' ? ` (faltam ${launch.days} ${launch.days === 1 ? 'dia' : 'dias'})` : ''}, para profissionais aprovados.</span>
             </p>}
@@ -92,9 +93,9 @@ export default function Inicio() {
             <Link to="/admin" className="flex min-h-14 items-center gap-3 rounded-2xl bg-graphite px-5 font-semibold text-white"><ShieldCheck size={20} aria-hidden="true" /> Painel administrativo <ArrowRight size={18} className="ml-auto" aria-hidden="true" /></Link>
           )}
 
-          <details className="rounded-2xl bg-white p-4" open={h.status!=='approved'||h.unreadAnnouncements>0?true:undefined}>
+          <details className="rounded-2xl bg-white p-4" open={(h.status!=='approved'&&h.status!=='master')||h.unreadAnnouncements>0?true:undefined}>
             <summary className="cursor-pointer font-semibold">Mais opções e informações {h.unreadAnnouncements>0?' · '+h.unreadAnnouncements+' novo(s)':''}</summary>
-            <div className="mt-3 space-y-3"><Journey h={h}/>
+            <div className="mt-3 space-y-3">{h.status!=='master'&&<Journey h={h}/>}
           <InstallPrompt />
           <PushCard />
 
@@ -123,7 +124,7 @@ export default function Inicio() {
                 { to: '/area#inicio', Icon: ShieldCheck, t: 'Acompanhar a situação do cadastro', s: h.statusLabel },
                 { to: '/area#comunicados', Icon: Megaphone, t: 'Ler os comunicados', s: h.unreadAnnouncements > 0 ? `${h.unreadAnnouncements} novo(s)` : 'em dia' },
                 { to: '/area/mensagens', Icon: MessageSquare, t: 'Ver mensagens da equipe', s: h.unreadMessages > 0 ? `${h.unreadMessages} não lida(s)` : 'em dia' },
-                { to: '/area/perfil', Icon: UserRound, t: 'Se preparar para o lançamento', s: h.profilePrepared ? 'perfil completo' : 'complete seu perfil' },
+                { to: '/area/perfil', Icon: UserRound, t: 'Meu perfil', s: h.profilePrepared ? 'perfil completo' : 'complete seu perfil' },
                 { to: '/area#indicar', Icon: Users, t: 'Indicar a plataforma a outros profissionais', s: '' },
               ].map(({ to, Icon, t, s }) => (
                 <li key={t}><Link to={to} className="flex min-h-14 items-center gap-3 py-2"><Icon size={20} strokeWidth={1.75} className="shrink-0" aria-hidden="true" /><span className="flex-1 leading-snug">{t}</span>{s && <span className="text-[13px] text-muted">{s}</span>}<ArrowRight size={16} className="text-muted" aria-hidden="true" /></Link></li>
