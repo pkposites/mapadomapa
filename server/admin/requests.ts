@@ -60,13 +60,14 @@ const summary = (r: Row) => ({
 
 export async function listRequests(status: unknown) {
   const st = typeof status === 'string' && ['draft', 'published', 'closed'].includes(status) ? status : null
-  const rows = await query<Row>(`${SELECT} WHERE ($1::text IS NULL OR r.status = $1) ORDER BY r.created_at DESC, r.id DESC LIMIT 200`, [st])
-  const counts = await query<Row>(`SELECT status, count(*)::int n FROM service_requests GROUP BY status`)
-  return { items: rows.map(summary), counts: Object.fromEntries(['draft', 'published', 'closed'].map((s) => [s, counts.find((c) => c.status === s)?.n ?? 0])), urgency: URGENCY }
+  const trashed = status === 'trash'
+  const rows = await query<Row>(`${SELECT} WHERE (CASE WHEN $2::boolean THEN r.deleted_at IS NOT NULL ELSE r.deleted_at IS NULL END) AND ($1::text IS NULL OR r.status = $1) ORDER BY COALESCE(r.deleted_at,r.created_at) DESC, r.id DESC LIMIT 200`, [st,trashed])
+  const counts = await query<Row>(`SELECT CASE WHEN deleted_at IS NOT NULL THEN 'trash' ELSE status END AS status, count(*)::int n FROM service_requests GROUP BY 1`)
+  return { items: rows.map(summary), counts: Object.fromEntries(['draft', 'published', 'closed', 'trash'].map((s) => [s, counts.find((c) => c.status === s)?.n ?? 0])), urgency: URGENCY }
 }
 
 export async function requestDetail(id: string) {
-  const r = (await query<Row>(`${SELECT} WHERE r.id = $1`, [id]))[0]
+  const r = (await query<Row>(`${SELECT} WHERE r.id = $1 AND r.deleted_at IS NULL`, [id]))[0]
   if (!r) throw new ApiError(404, 'not_found', 'Pedido não encontrado.')
   const interested = await query<Row>(
     `SELECT i.created_at, i.selected_at, i.contact_delivered_at, ${accessPredicate('u.id')} AS can_receive, u.id AS user_id, pr.full_name, ph.e164, ph.verified_at,
@@ -124,13 +125,13 @@ export async function createRequest(adminId: string, body: Record<string, unknow
 }
 
 export async function updateRequest(adminId: string, id: string, body: Record<string, unknown>) {
-  const cur = (await query<Row>('SELECT status FROM service_requests WHERE id = $1', [id]))[0]
+  const cur = (await query<Row>('SELECT status FROM service_requests WHERE id = $1 AND deleted_at IS NULL', [id]))[0]
   if (!cur) throw new ApiError(404, 'not_found', 'Pedido não encontrado.')
   if (cur.status !== 'draft') throw new ApiError(409, 'not_editable', 'Só rascunhos podem ser editados. Encerre este pedido e crie outro, se necessário.')
   const v = await validate(body)
   await query(
     `UPDATE service_requests SET client_name=$2, client_phone=$3, profession_id=$4, region_id=$5, neighborhood=$6, title=$7, description=$8, urgency=$9, period_note=$10,
-       consent=$11, consent_at = CASE WHEN $11 THEN COALESCE(consent_at, $12) ELSE NULL END, updated_at=$12 WHERE id=$1`,
+       consent=$11, consent_at = CASE WHEN $11 THEN COALESCE(consent_at, $12) ELSE NULL END, updated_at=$12 WHERE id=$1 AND deleted_at IS NULL`,
     [id, v.clientName, v.clientPhone, v.professionId, v.regionId, v.neighborhood, v.title, v.description, v.urgency, v.periodNote, v.consent, now()])
   await audit('admin.request_updated', { userId: adminId, details: { id } })
   if (body.publish === true) return publishRequest(adminId, id)
@@ -138,26 +139,33 @@ export async function updateRequest(adminId: string, id: string, body: Record<st
 }
 
 export async function publishRequest(adminId: string, id: string) {
-  const r = (await query<Row>('SELECT status, consent FROM service_requests WHERE id = $1', [id]))[0]
+  const r = (await query<Row>('SELECT status, consent FROM service_requests WHERE id = $1 AND deleted_at IS NULL', [id]))[0]
   if (!r) throw new ApiError(404, 'not_found', 'Pedido não encontrado.')
   if (r.status !== 'draft') throw new ApiError(409, 'invalid_transition', 'Só rascunhos podem ser publicados.')
   if (!r.consent) throw bad('consent_required', 'Para publicar, confirme que o cliente autorizou o registro e o uso dos dados para intermediação.')
-  await query(`UPDATE service_requests SET status = 'published', published_at = $2, updated_at = $2 WHERE id = $1 AND status = 'draft'`, [id, now()])
+  await query(`UPDATE service_requests SET status = 'published', published_at = $2, updated_at = $2 WHERE id = $1 AND deleted_at IS NULL AND status = 'draft'`, [id, now()])
   await audit('admin.request_published', { userId: adminId, details: { id } })
   return requestDetail(id)
 }
 
 export async function closeRequest(adminId: string, id: string) {
-  const r = (await query<Row>(`UPDATE service_requests SET status = 'closed', closed_at = $2, updated_at = $2 WHERE id = $1 AND status = 'published' RETURNING id`, [id, now()]))[0]
+  const r = (await query<Row>(`UPDATE service_requests SET status = 'closed', closed_at = $2, updated_at = $2 WHERE id = $1 AND deleted_at IS NULL AND status = 'published' RETURNING id`, [id, now()]))[0]
   if (!r) throw new ApiError(409, 'invalid_transition', 'Só pedidos publicados podem ser encerrados.')
   await audit('admin.request_closed', { userId: adminId, details: { id } })
   return requestDetail(id)
 }
 
-export async function deleteDraft(adminId: string, id: string) {
-  const r = await query<Row>(`DELETE FROM service_requests WHERE id = $1 AND status = 'draft' RETURNING id`, [id])
-  if (!r.length) throw new ApiError(409, 'invalid_transition', 'Só rascunhos podem ser excluídos.')
+export async function deleteRequest(adminId: string, id: string) {
+  const r = await query<Row>(`UPDATE service_requests SET deleted_at=$2,updated_at=$2 WHERE id=$1 AND deleted_at IS NULL RETURNING id`, [id,now()])
+  if (!r.length) throw new ApiError(404, 'not_found', 'Pedido não encontrado ou já excluído.')
   await audit('admin.request_deleted', { userId: adminId, details: { id } })
+  return { ok: true }
+}
+
+export async function restoreRequest(adminId: string, id: string) {
+  const r = await query<Row>(`UPDATE service_requests SET deleted_at=NULL,updated_at=$2 WHERE id=$1 AND deleted_at IS NOT NULL RETURNING id`, [id,now()])
+  if (!r.length) throw new ApiError(404,'not_found','Pedido não está na lixeira.')
+  await audit('admin.request_restored', { userId: adminId, details: { id } })
   return { ok: true }
 }
 
@@ -167,7 +175,7 @@ export async function convertIntake(adminId: string, intakeId: string, body: Rec
   const publish = body.publish === true
   if (publish && !v.consent) throw bad('consent_required', 'Confirme a autorização do cliente.')
   const id = await withTransaction(async (tx) => {
-    const raw = (await query<Row>('SELECT * FROM deforafora_intake WHERE id = $1 FOR UPDATE', [intakeId], tx))[0]
+    const raw = (await query<Row>('SELECT * FROM deforafora_intake WHERE id = $1 AND deleted_at IS NULL FOR UPDATE', [intakeId], tx))[0]
     if (!raw) throw new ApiError(404, 'not_found', 'Pedido não encontrado.')
     if (raw.converted_request_id) return String(raw.converted_request_id)
     const [r] = await query<Row>(
@@ -184,7 +192,7 @@ export async function convertIntake(adminId: string, intakeId: string, body: Rec
 /** Seleção definitiva: máximo de dois interessados elegíveis, mesmo com admins simultâneos. */
 export async function selectInterest(adminId: string, id: string, userId: string, confirmedViaWhatsApp = false) {
   await withTransaction(async (tx) => {
-    const r = (await query<Row>('SELECT status, consent, profession_id, region_id FROM service_requests WHERE id = $1 FOR UPDATE', [id], tx))[0]
+    const r = (await query<Row>('SELECT status, consent, profession_id, region_id FROM service_requests WHERE id = $1 AND deleted_at IS NULL FOR UPDATE', [id], tx))[0]
     if (!r || r.status !== 'published' || !r.consent) throw new ApiError(409, 'not_open', 'Pedido não está aberto ou autorizado.')
     const interest = (await query<Row>('SELECT selected_at FROM service_request_interests WHERE request_id = $1 AND user_id = $2', [id, userId], tx))[0]
     if (!interest && !confirmedViaWhatsApp) throw new ApiError(404, 'not_interested', 'Profissional não manifestou interesse.')
@@ -204,7 +212,7 @@ export async function selectInterest(adminId: string, id: string, userId: string
 }
 
 export async function markDelivered(adminId:string,id:string,userId:string) {
-  const [r]=await query<Row>(`UPDATE service_request_interests i SET contact_delivered_at=COALESCE(i.contact_delivered_at,now()) FROM service_requests r WHERE i.request_id=r.id AND r.id=$1 AND i.user_id=$2 AND i.selected_at IS NOT NULL AND r.consent RETURNING i.request_id`,[id,userId])
+  const [r]=await query<Row>(`UPDATE service_request_interests i SET contact_delivered_at=COALESCE(i.contact_delivered_at,now()) FROM service_requests r WHERE i.request_id=r.id AND r.id=$1 AND i.user_id=$2 AND i.selected_at IS NOT NULL AND r.consent AND r.deleted_at IS NULL RETURNING i.request_id`,[id,userId])
   if(!r) throw new ApiError(409,'not_selected','Selecione o profissional e confirme a autorização antes do repasse.')
   await audit('admin.request_contact_delivered',{userId:adminId,details:{id,professionalId:userId}})
   return requestDetail(id)
@@ -213,7 +221,7 @@ export async function markDelivered(adminId:string,id:string,userId:string) {
 export async function setRouting(adminId: string, id: string, body: Record<string, unknown>) {
   const mode = body.mode
   if (mode !== 'manual' && mode !== 'automatic') throw bad('invalid_mode', 'Escolha o modo de distribuição.')
-  const rows = await query<Row>("UPDATE service_requests SET routing_mode=$2 WHERE id=$1 AND status <> 'closed' RETURNING id", [id,mode])
+  const rows = await query<Row>("UPDATE service_requests SET routing_mode=$2 WHERE id=$1 AND deleted_at IS NULL AND status <> 'closed' RETURNING id", [id,mode])
   if (!rows.length) throw new ApiError(409,'not_open','Pedido encerrado ou inexistente.')
   await audit('admin.request_routing',{userId:adminId,details:{id,mode}})
   return requestDetail(id)
@@ -221,7 +229,7 @@ export async function setRouting(adminId: string, id: string, body: Record<strin
 
 export async function inviteProfessional(adminId: string, id: string, userId: string, body: Record<string, unknown>) {
   await withTransaction(async tx => {
-    const r = (await query<Row>("SELECT status,consent FROM service_requests WHERE id=$1 FOR UPDATE",[id],tx))[0]
+    const r = (await query<Row>("SELECT status,consent FROM service_requests WHERE id=$1 AND deleted_at IS NULL FOR UPDATE",[id],tx))[0]
     if (!r || r.status !== 'published' || !r.consent) throw new ApiError(409,'not_open','Pedido não está publicado ou autorizado.')
     if (body.invite === false) {
       const selected = (await query<Row>('SELECT selected_at FROM service_request_interests WHERE request_id=$1 AND user_id=$2',[id,userId],tx))[0]

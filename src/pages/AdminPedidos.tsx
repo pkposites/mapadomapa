@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Clock, MessageCircle, Plus, RefreshCw, UserRound } from 'lucide-react'
+import { ArrowLeft, Clock, MessageCircle, Plus, RefreshCw, Trash2, UserRound } from 'lucide-react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import Alert from '../components/ui/Alert'
@@ -62,12 +62,18 @@ function intakeCsv(raw: string) {
   return rows.filter(x=>x.some(Boolean)).map(r=>Object.fromEntries(fields.map(k=>[k,r[headers.indexOf(k)]??''])))
 }
 function Incoming() {
-  const [incoming, setIncoming] = useState<{ count: number; items: IntakeItem[] } | null>(null)
+  const [incoming, setIncoming] = useState<{ count: number; items: IntakeItem[]; trash: IntakeItem[] } | null>(null)
   const [failed, setFailed] = useState(false)
   const [importing,setImporting]=useState(false)
   const [importMessage,setImportMessage]=useState('')
   async function recover(file: File) { setImporting(true); setImportMessage(''); try { const items=intakeCsv(await file.text()); const totals={imported:0,duplicates:0,rejected:0}; for(let i=0;i<items.length;i+=10){const r=await api.post<typeof totals>('/admin/requests/intake/import',{items:items.slice(i,i+10)});totals.imported+=r.imported;totals.duplicates+=r.duplicates;totals.rejected+=r.rejected} setImportMessage(`${totals.imported} importado(s) · ${totals.duplicates} já existente(s) · ${totals.rejected} inválido(s).`);refresh() } catch(e){setImportMessage(e instanceof Error?e.message:'Importação não concluída.')} finally{setImporting(false)} }
-  const refresh = () => { setFailed(false); api.get<{count:number; items:IntakeItem[]}>('/admin/requests/intake').then(setIncoming).catch(() => setFailed(true)) }
+  const refresh = () => { setFailed(false); api.get<{count:number; items:IntakeItem[]; trash:IntakeItem[]}>('/admin/requests/intake').then(setIncoming).catch(() => setFailed(true)) }
+  const [deleting,setDeleting]=useState(false)
+  const [actionError,setActionError]=useState('')
+  async function trashAction(id:string,restore=false) {
+    if(!window.confirm(restore?'Restaurar este pedido?':'Excluir esta solicitação? Ela ficará na lixeira e não será encaminhada.'))return
+    setDeleting(true);setActionError('');try{const url='/admin/requests/intake/'+encodeURIComponent(id);if(restore)await api.post(url+'/restore');else await api.del(url);refresh()}catch(e){setActionError(e instanceof Error?e.message:'Não foi possível concluir.')}finally{setDeleting(false)}
+  }
   useEffect(refresh, [])
   return <section className="mt-5 rounded-3xl bg-white p-4">
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -85,35 +91,46 @@ function Incoming() {
           <p className="text-[13px] text-muted">{r.client_name} · {fmt(r.received_at)}</p>
           <p className="mt-2 font-semibold text-[14px]">Revisar e encaminhar →</p>
         </Link>
+        <button type="button" disabled={deleting} onClick={()=>void trashAction(r.id)} className="mb-3 flex min-h-10 items-center gap-2 rounded-xl border border-line px-3 text-[13px] font-semibold text-red-700"><Trash2 size={16}/> Excluir pedido</button>
       </li>)}</ul>
+      {actionError&&<p className="mt-2 text-[14px] text-red-700" role="alert">{actionError}</p>}
+      {!!incoming.trash?.length&&<details className="mt-3 rounded-xl bg-ice p-3"><summary className="cursor-pointer text-[14px] font-semibold">Lixeira · De fora a fora ({incoming.trash.length})</summary><ul className="mt-2 divide-y divide-line">{incoming.trash.map(r=><li key={r.id} className="flex items-center justify-between gap-3 py-2"><span className="min-w-0 break-words text-[14px]">{r.service} · {r.client_name}</span><button type="button" disabled={deleting} className="min-h-11 shrink-0 rounded-xl border border-line bg-white px-3 text-[13px] font-semibold" onClick={()=>void trashAction(r.id,true)}>Restaurar</button></li>)}</ul></details>}
     </>}
   </section>
 }
 
 function List() {
-  const [tab, setTab] = useState<'published' | 'draft' | 'closed'>('published')
+  const [tab, setTab] = useState<'published' | 'draft' | 'closed' | 'trash'>('published')
   const [data, setData] = useState<{ items: Summary[]; counts: Record<string, number> } | null>(null)
-  useEffect(() => { setData(null); api.get<{ items: Summary[]; counts: Record<string, number> }>(`/admin/requests?status=${tab}`).then(setData).catch(() => setData({ items: [], counts: {} })) }, [tab])
+  const [actionError,setActionError]=useState('')
+  const [working,setWorking]=useState(false)
+  const refresh=()=>{setData(null);api.get<{items:Summary[];counts:Record<string,number>}>(`/admin/requests?status=${tab}`).then(setData).catch(()=>setData({items:[],counts:{}}))}
+  useEffect(refresh,[tab])
+  async function changeTrash(r:Summary,restore:boolean){
+    if(!window.confirm(restore?(r.status==='published'?'Restaurar este pedido? Ele voltará a ficar disponível para os profissionais selecionados.':'Restaurar este pedido?'):'Excluir este pedido? Ele será retirado dos profissionais e ficará na lixeira.'))return
+    setWorking(true);setActionError('');try{const url='/admin/requests/'+r.id;if(restore)await api.post(url+'/restore');else await api.del(url);refresh()}catch(e){setActionError(e instanceof Error?e.message:'Não foi possível concluir.')}finally{setWorking(false)}
+  }
   return (
     <Shell title="Pedidos de Serviços" back="/admin">
       <p className="mt-1 text-[15px] text-muted">Cadastre pedidos reais recebidos de clientes. Você controla quem recebe cada pedido.</p>
       <Link to="/admin/pedidos/novo" data-testid="new-request" className="mt-4 flex min-h-13 items-center justify-center gap-2 rounded-2xl bg-lime px-5 font-semibold text-graphite"><Plus size={20} aria-hidden="true" /> Novo pedido</Link>
       <Incoming />
-      <div className="mt-4 grid grid-cols-3 gap-2" role="group" aria-label="Situação">
-        {([['published', 'Abertos'], ['draft', 'Rascunhos'], ['closed', 'Encerrados']] as const).map(([k, l]) => (
+      <div className="mt-4 grid grid-cols-4 gap-2" role="group" aria-label="Situação">
+        {([['published', 'Abertos'], ['draft', 'Rascunhos'], ['closed', 'Encerrados'], ['trash','Lixeira']] as const).map(([k, l]) => (
           <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)} className={`min-h-14 rounded-2xl border p-2 text-center ${tab === k ? 'border-graphite bg-graphite text-white' : 'border-line bg-white'}`}>
             <span className="block text-[20px] font-bold leading-none">{data?.counts[k] ?? '–'}</span><span className={`text-[13px] ${tab === k ? 'text-on-dark' : 'text-muted'}`}>{l}</span>
           </button>))}
       </div>
       {!data && <div className="mt-8 flex justify-center"><Spinner /></div>}
       {data?.items.length === 0 && <p className="mt-8 text-center text-muted">Nenhum pedido nesta situação.</p>}
+      {actionError&&<p className="mt-3 text-red-700" role="alert">{actionError}</p>}
       <ul className="mt-4 space-y-3">{data?.items.map((r) => (
-        <li key={r.id}><Link to={`/admin/pedidos/${r.id}`} className="block rounded-2xl bg-white p-4" data-testid="request-row">
+        <li key={r.id}>{tab==='trash'?<div className="rounded-2xl bg-white p-4"><p className="font-semibold">{r.title}</p><p className="mt-1 text-[14px] text-muted">{r.profession} · {r.region} · {r.clientName}</p><button type="button" disabled={working} className="mt-3 min-h-11 rounded-xl border border-line px-4 text-[14px] font-semibold" onClick={()=>void changeTrash(r,true)}>Restaurar pedido</button></div>:<><Link to={`/admin/pedidos/${r.id}`} className="block rounded-2xl bg-white p-4" data-testid="request-row">
           <div className="flex items-start justify-between gap-3"><p className="text-[17px] font-semibold leading-snug">{r.title}</p><Badge s={r.status} /></div>
           <p className="mt-1 text-[14px] text-muted">{r.profession} · {r.region} · {r.neighborhood}</p>
           <p className="mt-1 text-[13px] text-muted">{urgencyLabel(r.urgency)} · Cliente: {r.clientName}</p>
           {r.status !== 'draft' && <p className="mt-2 flex items-center gap-1.5 text-[14px] font-semibold"><UserRound size={16} aria-hidden="true" /> {r.interests} interessado(s)</p>}{r.status === 'published' && r.interests === 0 && <p className="mt-2 rounded-xl bg-[#fff4db] px-3 py-2 text-[13px] font-bold text-[#7a5a00]">{r.urgency === 'urgent' ? 'Urgente · ' : ''}Aguardando resposta · acionar profissionais →</p>}
-        </Link></li>))}</ul>
+        </Link><button type="button" disabled={working} onClick={()=>void changeTrash(r,false)} className="mt-1 flex min-h-11 items-center gap-2 rounded-xl border border-line bg-white px-3 text-[13px] font-semibold text-red-700"><Trash2 size={16}/> Excluir pedido</button></>}</li>))}</ul>
     </Shell>
   )
 }
@@ -294,9 +311,9 @@ function DetailPage() {
         {d.status === 'draft' && <>
           {d.consent && <SubmitButton type="button" loading={busy} onClick={() => act(() => api.post(`/admin/requests/${d.id}/publish`))} data-testid="publish-now">Publicar e escolher profissionais</SubmitButton>}
           <Link to={`/admin/pedidos/${d.id}/editar`} className="flex min-h-13 items-center justify-center rounded-2xl border border-line bg-white font-semibold">Editar rascunho</Link>
-          <SubmitButton type="button" variant="ghost" className="border border-line" loading={busy} onClick={() => { if (window.confirm('Excluir este rascunho?')) void act(async () => { await api.del(`/admin/requests/${d.id}`); navigate('/admin/pedidos', { replace: true }) }) }}>Excluir rascunho</SubmitButton>
         </>}
         {d.status === 'published' && <SubmitButton type="button" variant="ghost" className="border border-line" loading={busy} onClick={() => { if (window.confirm('Encerrar este pedido? Ele some da lista dos profissionais.')) void act(() => api.post(`/admin/requests/${d.id}/close`)) }} data-testid="close">Encerrar pedido</SubmitButton>}
+        <SubmitButton type="button" variant="ghost" className="border border-line text-red-700" loading={busy} onClick={async()=>{if(!window.confirm('Excluir este pedido? Ele sairá da área dos profissionais e ficará na lixeira.'))return;setBusy(true);setErr(null);try{await api.del('/admin/requests/'+d.id);navigate('/admin/pedidos',{replace:true})}catch(e){setErr(e instanceof Error?e.message:'Não foi possível excluir.');setBusy(false)}}}><Trash2 size={18}/> Excluir pedido</SubmitButton>
       </div>
     </Shell>
   )

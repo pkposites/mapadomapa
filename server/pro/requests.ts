@@ -22,7 +22,7 @@ export async function listOpportunities(userId: string, master = false) {
             EXISTS (SELECT 1 FROM service_request_interests i WHERE i.request_id = r.id AND i.user_id = $1) AS interested,
             EXISTS (SELECT 1 FROM service_request_invites v WHERE v.request_id=r.id AND v.user_id=$1) AS invited
      FROM service_requests r JOIN professions p ON p.id = r.profession_id JOIN service_regions g ON g.id = r.region_id
-     WHERE r.status = 'published'
+     WHERE r.status = 'published' AND r.deleted_at IS NULL
        AND ($3::boolean OR (
         (EXISTS (SELECT 1 FROM service_request_invites v WHERE v.request_id=r.id AND v.user_id=$1)
           OR (r.routing_mode='automatic' AND $4::boolean AND ($2::boolean OR EXISTS (SELECT 1 FROM service_request_interests old WHERE old.request_id=r.id AND old.user_id=$1))
@@ -45,12 +45,12 @@ export async function showInterest(userId: string, id: string) {
   await enforce(`req:interest:${userId}`, 60, 3600)
   const open = await listOpportunities(userId)
   if (!open.allowed) throw new ApiError(403, 'not_approved', 'Pedidos ficam disponíveis para profissionais aprovados.')
-  const req = (await query<Row>('SELECT status FROM service_requests WHERE id = $1', [id]))[0]
-  if (req && req.status === 'closed') throw new ApiError(409, 'request_closed', 'Este pedido já foi encerrado.')
+  const req = (await query<Row>('SELECT status FROM service_requests WHERE id = $1 AND deleted_at IS NULL', [id]))[0]
+  if (!req || req.status === 'closed') throw new ApiError(409, 'request_closed', 'Este pedido já foi encerrado.')
   const item = (open.items as { id: string }[]).find((i) => i.id === id)
   if (!item) throw new ApiError(404, 'not_found', 'Pedido não encontrado.') // inexistente, rascunho ou fora do seu perfil
   // Chave primária composta: manifestar duas vezes é impossível (a 2ª chamada não cria nada).
-  const r = await query<Row>('INSERT INTO service_request_interests (request_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING request_id', [id, userId])
+  const r = await query<Row>('INSERT INTO service_request_interests (request_id, user_id) SELECT id,$2 FROM service_requests WHERE id=$1 AND status=\'published\' AND deleted_at IS NULL ON CONFLICT DO NOTHING RETURNING request_id', [id, userId])
   if (r.length) await audit('pro.request_interest', { userId, details: { id } })
   return { ok: true, alreadyInterested: r.length === 0 }
 }

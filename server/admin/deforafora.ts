@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto'
 import { query } from '../lib/db'
+import { audit } from '../lib/audit'
 import { env } from '../lib/env'
 import { ApiError, readJson } from '../lib/http'
 
@@ -47,14 +48,15 @@ async function storeIntake(body: Record<string, unknown>) {
 
 export async function listIntake() {
   const rows = await query<Row>(`SELECT id, client_name, service, location, urgency, contact_preference, received_at
-    FROM deforafora_intake WHERE converted_request_id IS NULL ORDER BY received_at DESC LIMIT 200`)
-  const [{ count }] = await query<Row>('SELECT count(*)::int AS count FROM deforafora_intake WHERE converted_request_id IS NULL')
-  return { count, items: rows }
+    FROM deforafora_intake WHERE converted_request_id IS NULL AND deleted_at IS NULL ORDER BY received_at DESC LIMIT 200`)
+  const [{ count }] = await query<Row>('SELECT count(*)::int AS count FROM deforafora_intake WHERE converted_request_id IS NULL AND deleted_at IS NULL')
+  const trash = await query<Row>(`SELECT id,client_name,service,location,urgency,contact_preference,received_at FROM deforafora_intake WHERE converted_request_id IS NULL AND deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 200`)
+  return { count, items: rows, trash }
 }
 
 export async function intakeDetail(id: string) {
   if (!validId(id)) throw new ApiError(404, 'not_found', 'Pedido não encontrado.')
-  const row = (await query<Row>('SELECT * FROM deforafora_intake WHERE id = $1', [id]))[0]
+  const row = (await query<Row>('SELECT * FROM deforafora_intake WHERE id = $1 AND deleted_at IS NULL', [id]))[0]
   if (!row) throw new ApiError(404, 'not_found', 'Pedido não encontrado.')
   return row
 }
@@ -70,4 +72,17 @@ export async function importIntake(body: Record<string, unknown>) {
     } catch(e) { if (e instanceof ApiError) rejected++; else throw e }
   }
   return { imported, duplicates, rejected }
+}
+
+export async function deleteIntake(adminId: string,id: string) {
+  const rows=await query<Row>('UPDATE deforafora_intake SET deleted_at=now() WHERE id=$1 AND converted_request_id IS NULL AND deleted_at IS NULL RETURNING id',[id])
+  if (!rows.length) throw new ApiError(404,'not_found','Pedido não encontrado ou já encaminhado.')
+  await audit('admin.deforafora_deleted',{userId:adminId,details:{id}})
+  return {ok:true}
+}
+export async function restoreIntake(adminId: string,id: string) {
+  const rows=await query<Row>('UPDATE deforafora_intake SET deleted_at=NULL WHERE id=$1 AND converted_request_id IS NULL AND deleted_at IS NOT NULL RETURNING id',[id])
+  if(!rows.length) throw new ApiError(404,'not_found','Pedido não está na lixeira.')
+  await audit('admin.deforafora_restored',{userId:adminId,details:{id}})
+  return {ok:true}
 }
