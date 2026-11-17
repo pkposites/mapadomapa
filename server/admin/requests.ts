@@ -1,6 +1,6 @@
 import { audit } from '../lib/audit'
 import { now } from '../lib/clock'
-import { query } from '../lib/db'
+import { query, withTransaction } from '../lib/db'
 import { ApiError } from '../lib/http'
 import { formatNational, parseBrazilMobile } from '../lib/phone'
 
@@ -68,20 +68,21 @@ export async function requestDetail(id: string) {
   const r = (await query<Row>(`${SELECT} WHERE r.id = $1`, [id]))[0]
   if (!r) throw new ApiError(404, 'not_found', 'Pedido não encontrado.')
   const interested = await query<Row>(
-    `SELECT i.created_at, u.id AS user_id, pr.full_name, ph.e164, ph.verified_at,
+    `SELECT i.created_at, i.selected_at, u.id AS user_id, pr.full_name, ph.e164, ph.verified_at,
             (SELECT array_agg(p.name ORDER BY p.sort_order) FROM profile_professions x JOIN professions p ON p.id = x.profession_id WHERE x.user_id = u.id) AS professions,
             (SELECT array_agg(g.name ORDER BY g.sort_order) FROM professional_regions y JOIN service_regions g ON g.id = y.region_id WHERE y.user_id = u.id) AS regions
      FROM service_request_interests i JOIN users u ON u.id = i.user_id
      LEFT JOIN professional_profiles pr ON pr.user_id = u.id LEFT JOIN phones ph ON ph.user_id = u.id AND ph.is_primary
      WHERE i.request_id = $1 ORDER BY i.created_at`, [id])
+  const source = (await query<Row>('SELECT contact_preference, photo_reference FROM deforafora_intake WHERE converted_request_id = $1', [id]))[0]
   return {
-    ...summary(r), description: r.description as string, periodNote: r.period_note as string | null, consent: r.consent as boolean, consentAt: r.consent_at,
+    ...summary(r), origin: source ? 'De fora a fora' : null, contactPreference: source?.contact_preference ?? null, photoReference: source?.photo_reference ?? null, description: r.description as string, periodNote: r.period_note as string | null, consent: r.consent as boolean, consentAt: r.consent_at,
     professionSlug: r.profession_slug as string, regionSlug: r.region_slug as string,
     client: { name: r.client_name as string, phone: formatNational(r.client_phone), whatsapp: String(r.client_phone).replace(/\D/g, '') },
     eligible: await eligibleCount(r.profession_id, r.region_id), urgencyOptions: URGENCY,
     interested: interested.map((i) => ({
       id: i.user_id as string, name: (i.full_name ?? null) as string | null, phone: i.e164 ? formatNational(i.e164) : null, whatsapp: i.e164 ? String(i.e164).replace(/\D/g, '') : null,
-      phoneVerified: Boolean(i.verified_at), professions: (i.professions ?? []) as string[], regions: (i.regions ?? []) as string[], at: i.created_at,
+      phoneVerified: Boolean(i.verified_at), professions: (i.professions ?? []) as string[], regions: (i.regions ?? []) as string[], at: i.created_at, selectedAt: i.selected_at ?? null,
     })),
   }
 }
@@ -134,4 +135,45 @@ export async function deleteDraft(adminId: string, id: string) {
   if (!r.length) throw new ApiError(409, 'invalid_transition', 'Só rascunhos podem ser excluídos.')
   await audit('admin.request_deleted', { userId: adminId, details: { id } })
   return { ok: true }
+}
+
+/** Converte uma entrada privada, revisada pelo admin, em um pedido no fluxo existente. */
+export async function convertIntake(adminId: string, intakeId: string, body: Record<string, unknown>) {
+  const v = await validate(body)
+  const publish = body.publish === true
+  if (publish && !v.consent) throw bad('consent_required', 'Confirme a autorização do cliente.')
+  const id = await withTransaction(async (tx) => {
+    const raw = (await query<Row>('SELECT * FROM deforafora_intake WHERE id = $1 FOR UPDATE', [intakeId], tx))[0]
+    if (!raw) throw new ApiError(404, 'not_found', 'Pedido não encontrado.')
+    if (raw.converted_request_id) return String(raw.converted_request_id)
+    const [r] = await query<Row>(
+      `INSERT INTO service_requests (status,client_name,client_phone,profession_id,region_id,neighborhood,title,description,urgency,period_note,consent,consent_at,created_by,published_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+      [publish ? 'published' : 'draft', v.clientName, v.clientPhone, v.professionId, v.regionId, v.neighborhood, v.title, v.description, v.urgency, v.periodNote, v.consent, v.consent ? raw.received_at : null, adminId, publish ? now() : null], tx)
+    await query('UPDATE deforafora_intake SET converted_request_id = $2 WHERE id = $1', [intakeId, r.id], tx)
+    return String(r.id)
+  })
+  await audit('admin.deforafora_converted', { userId: adminId, details: { id } })
+  return requestDetail(id)
+}
+
+/** Seleção definitiva: máximo de dois interessados elegíveis, mesmo com admins simultâneos. */
+export async function selectInterest(adminId: string, id: string, userId: string) {
+  await withTransaction(async (tx) => {
+    const r = (await query<Row>('SELECT status, consent, profession_id, region_id FROM service_requests WHERE id = $1 FOR UPDATE', [id], tx))[0]
+    if (!r || r.status !== 'published' || !r.consent) throw new ApiError(409, 'not_open', 'Pedido não está aberto ou autorizado.')
+    const interest = (await query<Row>('SELECT selected_at FROM service_request_interests WHERE request_id = $1 AND user_id = $2', [id, userId], tx))[0]
+    if (!interest) throw new ApiError(404, 'not_interested', 'Profissional não manifestou interesse.')
+    if (interest.selected_at) return
+    const [{ n }] = await query<Row>('SELECT count(*)::int AS n FROM service_request_interests WHERE request_id = $1 AND selected_at IS NOT NULL', [id], tx)
+    if (n >= 2) throw new ApiError(409, 'selection_limit', 'Já foram selecionados dois profissionais.')
+    const eligible = (await query<Row>(`SELECT 1 FROM professional_profiles p JOIN users u ON u.id=p.user_id
+      JOIN profile_professions pp ON pp.user_id=p.user_id AND pp.profession_id=$2
+      JOIN professional_regions rg ON rg.user_id=p.user_id AND rg.region_id=$3
+      WHERE p.user_id=$1 AND p.review_status='approved' AND u.status='active'`, [userId,r.profession_id,r.region_id], tx))[0]
+    if (!eligible) throw new ApiError(409, 'not_eligible', 'Profissional não está mais apto para este pedido.')
+    await query('UPDATE service_request_interests SET selected_at=$3 WHERE request_id=$1 AND user_id=$2', [id,userId,now()], tx)
+  })
+  await audit('admin.request_professional_selected', { userId: adminId, details: { id, professionalId: userId } })
+  return requestDetail(id)
 }

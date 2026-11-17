@@ -16,6 +16,7 @@ import * as area from './pro/area'
 import * as feed from './pro/feed'
 import * as boost from './pro/boost'
 import * as areq from './admin/requests'
+import * as intake from './admin/deforafora'
 import * as preq from './pro/requests'
 import * as adm from './admin/service'
 import * as auth from './services/auth'
@@ -53,6 +54,9 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   const token = readCookie(req, SESSION_COOKIE)
 
   if (method !== 'GET' && method !== 'HEAD') assertSameOrigin(req)
+
+  // Entrada exclusivamente servidor-a-servidor, autenticada por segredo de integração.
+  if (method === 'POST' && path === '/integrations/deforafora') return json(await intake.receiveDeforafora(req), 201)
 
   // ---------- Rotas só do ambiente local (simulador de SMS e utilitários de teste) ----------
   if (path.startsWith('/dev/')) {
@@ -184,6 +188,12 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (m && method === 'POST' && m[2] === '/welcome') return json(await adm.sendWelcome(admin.userId, m[1], (await readJson(req)).body))
     if (method === 'GET' && path === '/admin/welcome') return json(await adm.welcomeInfo())
     if (method === 'POST' && path === '/admin/welcome-all') return json(await adm.sendWelcomeAll(admin.userId, (await readJson(req)).body))
+    if (method === 'GET' && path === '/admin/requests/intake') return json(await intake.listIntake())
+    const it = path.match(/^\/admin\/requests\/intake\/([a-zA-Z0-9-]{10,100})(\/convert)?$/)
+    if (it && method === 'GET' && !it[2]) return json(await intake.intakeDetail(it[1]))
+    if (it && method === 'POST' && it[2]) return json(await areq.convertIntake(admin.userId, it[1], await readJson(req)))
+    const sel = path.match(/^\/admin\/requests\/(\d{1,15})\/select\/([0-9a-f-]{36})$/)
+    if (sel && method === 'POST') return json(await areq.selectInterest(admin.userId, sel[1], sel[2]))
     if (method === 'GET' && path === '/admin/requests') return json(await areq.listRequests(url.searchParams.get('status')))
     if (method === 'POST' && path === '/admin/requests') return json(await areq.createRequest(admin.userId, await readJson(req)))
     const ar = path.match(/^\/admin\/requests\/(\d{1,15})(\/publish|\/close)?$/)
