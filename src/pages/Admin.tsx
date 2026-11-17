@@ -1,7 +1,7 @@
 import { RechargeSettings } from '../admin/Recharge'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ChevronRight, ClipboardList, Megaphone, MessageCircle, MessageSquare, ShieldAlert, Search } from 'lucide-react'
+import { Mail, AlertTriangle, ChevronRight, ClipboardList, Megaphone, MessageCircle, MessageSquare, ShieldAlert, Search } from 'lucide-react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import Alert from '../components/ui/Alert'
@@ -58,6 +58,7 @@ function Panel() {
             <Link to="/admin/pedidos" data-testid="link-pedidos" className="col-span-2 flex min-h-14 items-center gap-2 rounded-2xl bg-lime px-4 font-semibold text-graphite"><ClipboardList size={18} aria-hidden="true" /> Pedidos de Serviços</Link>
             <Link to="/admin/mural" className="flex min-h-14 items-center gap-2 rounded-2xl bg-white px-4 font-semibold"><MessageSquare size={18} aria-hidden="true" /> Mural</Link>
             <Link to="/admin/destaque" className="flex min-h-14 items-center gap-2 rounded-2xl bg-white px-4 font-semibold"><Megaphone size={18} aria-hidden="true" /> Interesse no Destaque</Link>
+            <Link to="/admin/emails" className="flex min-h-14 items-center gap-2 rounded-2xl bg-white px-4 font-semibold"><Mail size={18} aria-hidden="true" /> E-mails automáticos</Link>
             <Link to="/admin/comunicados" className="flex min-h-14 items-center gap-2 rounded-2xl bg-white px-4 font-semibold"><Megaphone size={18} aria-hidden="true" /> Comunicados</Link>
           </div>
 

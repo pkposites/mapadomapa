@@ -31,4 +31,4 @@ Preparar templates responsivos com a identidade visual do Mapa do Mapa, assunto,
 
 Antes de ativar: confirmar domínio remetente e credencial do Resend em ambiente protegido, definir os intervalos dos lembretes, separar avisos transacionais de comunicações promocionais (consentimento/preferências e descadastro), evitar disparos duplicados, enviar somente a endereços confirmados e testar cada template e evento. Aproveitar a integração e a fila de e-mails já existentes. Validar com Robson os textos, valores, prazos e regras antes de lançar.
 
-Status: backlog; não ativar novos disparos agora.
+Status: implementação dos modelos, fila protegida, controles administrativos e preferências concluída no código; ativação e teste real dependem de domínio remetente e chave do Resend. Todos os novos disparos começam desligados.

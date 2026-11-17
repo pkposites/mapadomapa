@@ -1,3 +1,4 @@
+import EmailPreferences from '../../area/EmailPreferences'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Camera, LogOut } from 'lucide-react'
@@ -146,6 +147,7 @@ export default function Perfil() {
           {note('regions')}
         </section>
 
+        {!user?.isAdmin&&<EmailPreferences/>}
         <InstallPrompt persistent />
 
         <SubmitButton type="button" variant="ghost" className="border border-line" onClick={async () => { try { await logout(); navigate('/', { replace: true }) } catch { setMsg({ tone: 'error', text: 'Não foi possível sair agora. Tente de novo.', at: 'top' }) } }}><LogOut size={18} aria-hidden="true" /> Sair da conta</SubmitButton>

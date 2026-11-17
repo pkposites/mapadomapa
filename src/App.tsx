@@ -13,6 +13,7 @@ import Mensagens from './pages/area/Mensagens'
 import Pedidos from './pages/area/Pedidos'
 import Recarga from './pages/area/Recarga'
 import Admin from './pages/Admin'
+import AdminEmails from './pages/AdminEmails'
 import AdminDestaque from './pages/AdminDestaque'
 import Destaque from './pages/area/Destaque'
 import AdminMural from './pages/AdminMural'
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/area/pedidos" element={<RequireAuth><Pedidos /></RequireAuth>} />
         <Route path="/profissional" element={<RequireAuth><ProfessionalEntry /></RequireAuth>} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/emails" element={<AdminEmails />} />
         <Route path="/admin/destaque" element={<AdminDestaque />} />
         <Route path="/admin/pedidos" element={<AdminPedidos />} />
         <Route path="/admin/pedidos/novo" element={<AdminPedidoForm />} />

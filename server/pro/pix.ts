@@ -86,6 +86,10 @@ async function syncPayment(mp:Row,expected?:string,expectedId?:string) {
     if(cycle&&['refunded','charged_back'].includes(status))await query('UPDATE request_recharge_cycles SET revoked_at=COALESCE(revoked_at,now()) WHERE id=$1',[cycle],tx)
     const qr=typeof td?.qr_code==='string'&&td.qr_code.length<=10000?td.qr_code:null
     const img=typeof td?.qr_code_base64==='string'&&td.qr_code_base64.length<=500000&&/^[A-Za-z0-9+/=]+$/.test(td.qr_code_base64)?td.qr_code_base64:null
+    if(p.status!==status && ['cancelled','rejected','refunded','charged_back'].includes(status)) {
+      const key=['refunded','charged_back'].includes(status)?'payment-refund-':'payment-cancelled-'
+      await queueEmail(String(p.user_id),key+ref,'','',tx)
+    }
     if(p.status!==status)await query('INSERT INTO request_recharge_payment_events(payment_id,previous_status,new_status) VALUES ($1,$2,$3)',[ref,p.status,status],tx)
     const [updated]=await query<Row>(`UPDATE request_recharge_payments SET provider_id=$2,status=$3,cycle_id=$4,qr_code=CASE WHEN $3='pending' THEN COALESCE($5,qr_code) ELSE NULL END,
       qr_image=CASE WHEN $3='pending' THEN COALESCE($6,qr_image) ELSE NULL END,expires_at=$7,updated_at=now() WHERE id=$1 RETURNING *`,[ref,pid,status,cycle,qr,img,expiry??p.expires_at],tx)

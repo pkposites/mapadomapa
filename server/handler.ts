@@ -23,6 +23,7 @@ import * as preq from './pro/requests'
 import * as adm from './admin/service'
 import * as auth from './services/auth'
 import * as email from './services/email'
+import * as emailControls from './admin/email-controls'
 
 function photoResponse(p: { type: string; data: Buffer } | null): Response {
   if (!p) return json({ error: { code: 'not_found', message: 'Sem foto.' } }, 404)
@@ -146,6 +147,9 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   if (path.startsWith('/pro/')) {
     const me = requireUser(await loadSession(token))
     if(!me.email&&!me.roles.includes('admin'))throw new ApiError(403,'email_required','Cadastre seu e-mail para continuar.')
+    if(path==='/pro/email-preferences' && method==='GET')return json(await emailControls.preferences(me.userId))
+    if(path==='/pro/email-preferences' && method==='PUT')return json(await emailControls.savePreferences(me.userId,await readJson(req)))
+    if(path==='/pro/app-installed' && method==='POST')return json(await emailControls.markInstalled(me.userId))
     if (method==='GET' && path==='/pro/recharge/pix') return json(await pix.checkoutState(me.userId,me.roles.includes('admin'),url.searchParams.get('verify')==='1'))
     if (method==='POST' && path==='/pro/recharge/pix') return json(await pix.createPix(me.userId,me.roles.includes('admin'),await readJson(req)))
     if (method === 'GET' && path === '/pro/catalog') return json(await pro.getCatalog())
@@ -204,6 +208,9 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   // ---------- Administração (apenas a base: guarda de permissão; painel vem depois) ----------
   if (path.startsWith('/admin/') && path !== '/admin/ping') {
     const admin = requireAdmin(await loadSession(token))
+    if(path==='/admin/email-templates' && method==='GET')return json(await emailControls.settings(admin))
+    if(path==='/admin/email-templates' && method==='PUT')return json(await emailControls.setEnabled(admin,await readJson(req)))
+    if(path==='/admin/email-templates/test' && method==='POST')return json(await emailControls.testTemplate(admin,await readJson(req)))
     const m = path.match(/^\/admin\/professionals\/([0-9a-f-]{36})(\/decision|\/phone|\/messages|\/photo|\/welcome|\/whatsapp-log)?$/)
     if(method==='GET' && path==='/admin/recharges/settings') return json(await recharge.getSettings())
     if(method==='PUT' && path==='/admin/recharges/settings') return json(await recharge.setSettings(admin.userId,await readJson(req)))

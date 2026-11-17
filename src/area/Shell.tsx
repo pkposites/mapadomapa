@@ -5,6 +5,8 @@ import { ArrowRight, Bell, ClipboardList, House, MessageSquare, Newspaper, UserR
 import Logo from '../components/Logo'
 import { api } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
+import { isStandalone } from '../lib/push'
+const installedReported = new Set<string>()
 
 const TABS = [
   { to: '/area', label: 'Início', Icon: House, end: true },
@@ -23,6 +25,13 @@ export default function AreaShell({ children }: { children: ReactNode }) {
   const [recharge,setRecharge]=useState<Recharge|null>(null)
   const [pending, setPending] = useState(0)
   const [urgent, setUrgent] = useState(0)
+  useEffect(()=>{if(!user?.id||user.isAdmin)return
+    const id=user.id
+    const report=()=>{if(installedReported.has(id))return;installedReported.add(id);api.post('/pro/app-installed').catch(()=>installedReported.delete(id))}
+    if(isStandalone())report()
+    window.addEventListener('appinstalled',report)
+    return ()=>window.removeEventListener('appinstalled',report)
+  },[user?.id,user?.isAdmin])
   useEffect(() => {
     const load = () => api.get<{ unread: number }>('/pro/messages/unread').then((r) => setUnread(r.unread)).catch(() => {})
     void load()
