@@ -29,7 +29,7 @@ function nextAction(h: Home): { label: string; to: string; why: string } {
       ? { label: 'Ver mensagens da equipe', to: '/area/mensagens', why: 'Seu cadastro está em análise. Não há nada obrigatório agora; acompanhe por aqui.' }
       : { label: 'Completar meu perfil', to: '/area/perfil', why: 'Enquanto a equipe analisa, deixe seu perfil pronto: foto, apresentação e serviços.' }
     case 'approved': return h.profilePrepared
-      ? { label: 'Ver o mural da comunidade', to: '/area/mural', why: 'Seu perfil está pronto. Acompanhe os comunicados até o início dos pedidos.' }
+      ? { label: 'Ver pedidos', to: '/area/pedidos', why: 'Confira oportunidades compatíveis com o seu perfil.' }
       : { label: 'Completar meu perfil', to: '/area/perfil', why: 'Cadastro aprovado! Deixe o perfil completo para o início dos pedidos.' }
     default: return { label: 'Falar com a equipe', to: '/area/mensagens', why: 'Converse com a equipe para entender a situação do seu cadastro.' }
   }
@@ -58,11 +58,11 @@ export default function Inicio() {
       {!h && !err && <div className="grid place-items-center py-20"><Spinner /></div>}
       {err && <Alert tone="error">Não foi possível carregar. Confira a internet e <button className="font-semibold underline" onClick={() => location.reload()}>tente de novo</button>.</Alert>}
       {h && next && (
-        <div className="space-y-5">
+        <div className="space-y-3">
           {/* 1. Boas-vindas */}
           <section id="inicio" className="rounded-3xl bg-graphite p-5 text-white" aria-label="Boas-vindas" data-testid="welcome">
             <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]" data-testid="greeting" data-clarity-mask="true">{h.firstName ? `Olá, ${h.firstName}!` : 'Olá!'}</h1>
-            <p className="mt-2 text-[15px] leading-relaxed text-on-dark">O Mapa do Mapa vai conectar profissionais de São Paulo a pedidos de orçamento. Estamos em <strong className="text-white">pré-lançamento</strong>: você já pode preparar seu perfil.</p>
+            <p className="mt-2 text-[15px] leading-relaxed text-on-dark">Bem-vindo à sua área profissional. Acompanhe seus pedidos e sua comunidade.</p>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <span className="text-[13px] font-semibold uppercase tracking-[0.1em] text-on-dark">Seu cadastro</span>
@@ -78,19 +78,23 @@ export default function Inicio() {
               <Link to={next.to} className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-graphite px-5 font-semibold text-white">{next.label} <ArrowRight size={18} aria-hidden="true" /></Link>
             </div>
 
-            <p className="mt-4 flex items-start gap-2.5 text-[14px] leading-snug text-on-dark" data-testid="launch-info">
+            {h.status!=='approved' && <p className="mt-4 flex items-start gap-2.5 text-[14px] leading-snug text-on-dark" data-testid="launch-info">
               <CalendarDays size={18} className="mt-0.5 shrink-0 text-lime" aria-hidden="true" />
               <span><strong className="text-white">Pedidos reais previstos a partir de {SITE.requestsOpenLabel}</strong>{launch.status === 'upcoming' ? ` (faltam ${launch.days} ${launch.days === 1 ? 'dia' : 'dias'})` : ''}, para profissionais aprovados.</span>
-            </p>
+            </p>}
           </section>
 
-          {/* 2. Jornada real */}
-          <Journey h={h} />
+          <div className="grid grid-cols-2 gap-2">
+            {[{to:'/area/pedidos',label:'Meus pedidos'},{to:'/area/mural',label:'Mural'},{to:'/area/mensagens',label:'Mensagens'},{to:'/area/perfil',label:'Meu perfil'}].map(x=><Link key={x.to} to={x.to} className="flex min-h-14 items-center justify-between rounded-2xl border border-line bg-white px-4 font-semibold text-[15px]">{x.label}<ArrowRight size={16}/></Link>)}
+          </div>
 
           {user?.isAdmin && (
             <Link to="/admin" className="flex min-h-14 items-center gap-3 rounded-2xl bg-graphite px-5 font-semibold text-white"><ShieldCheck size={20} aria-hidden="true" /> Painel administrativo <ArrowRight size={18} className="ml-auto" aria-hidden="true" /></Link>
           )}
 
+          <details className="rounded-2xl bg-white p-4" open={h.status!=='approved'||h.unreadAnnouncements>0?true:undefined}>
+            <summary className="cursor-pointer font-semibold">Mais opções e informações {h.unreadAnnouncements>0?' · '+h.unreadAnnouncements+' novo(s)':''}</summary>
+            <div className="mt-3 space-y-3"><Journey h={h}/>
           <InstallPrompt />
           <PushCard />
 
@@ -159,6 +163,8 @@ export default function Inicio() {
           <details className="rounded-3xl bg-white p-5" data-testid="how-it-works">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-[16px] font-bold [&::-webkit-details-marker]:hidden">Combinado claro <ChevronDown size={18} aria-hidden="true" /></summary>
             <TransparencyList className="mt-3 text-muted" />
+          </details>
+            </div>
           </details>
         </div>
       )}

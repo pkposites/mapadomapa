@@ -1,3 +1,4 @@
+import { RechargeSettings } from '../admin/Recharge'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, ChevronRight, ClipboardList, Megaphone, MessageCircle, MessageSquare, ShieldAlert, Search } from 'lucide-react'
@@ -60,6 +61,7 @@ function Panel() {
             <Link to="/admin/comunicados" className="flex min-h-14 items-center gap-2 rounded-2xl bg-white px-4 font-semibold"><Megaphone size={18} aria-hidden="true" /> Comunicados</Link>
           </div>
 
+          <RechargeSettings />
           {welcome && (
             <section className="mt-4 rounded-2xl bg-white p-4" aria-label="Boas-vindas coletivas">
               <p className="text-[15px] font-semibold">Boas-vindas para todos</p>

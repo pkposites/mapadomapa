@@ -1,3 +1,4 @@
+import { accessPredicate, getRecharge } from './recharges'
 import { audit } from '../lib/audit'
 import { now } from '../lib/clock'
 import { query, withTransaction } from '../lib/db'
@@ -22,7 +23,7 @@ export async function eligibleCount(professionId: number, regionId: number): Pro
      JOIN users u ON u.id = pr.user_id AND u.status = 'active'
      JOIN profile_professions pp ON pp.user_id = pr.user_id AND pp.profession_id = $1
      JOIN professional_regions rg ON rg.user_id = pr.user_id AND rg.region_id = $2
-     WHERE pr.review_status = 'approved'`, [professionId, regionId])
+     WHERE pr.review_status = 'approved' AND ${accessPredicate('u.id')}`, [professionId, regionId])
   return r[0].n
 }
 
@@ -68,7 +69,7 @@ export async function requestDetail(id: string) {
   const r = (await query<Row>(`${SELECT} WHERE r.id = $1`, [id]))[0]
   if (!r) throw new ApiError(404, 'not_found', 'Pedido não encontrado.')
   const interested = await query<Row>(
-    `SELECT i.created_at, i.selected_at, u.id AS user_id, pr.full_name, ph.e164, ph.verified_at,
+    `SELECT i.created_at, i.selected_at, i.contact_delivered_at, ${accessPredicate('u.id')} AS can_receive, u.id AS user_id, pr.full_name, ph.e164, ph.verified_at,
             (SELECT array_agg(p.name ORDER BY p.sort_order) FROM profile_professions x JOIN professions p ON p.id = x.profession_id WHERE x.user_id = u.id) AS professions,
             (SELECT array_agg(g.name ORDER BY g.sort_order) FROM professional_regions y JOIN service_regions g ON g.id = y.region_id WHERE y.user_id = u.id) AS regions
      FROM service_request_interests i JOIN users u ON u.id = i.user_id
@@ -80,7 +81,7 @@ export async function requestDetail(id: string) {
        JOIN profile_professions pp ON pp.user_id=p.user_id AND pp.profession_id=$2
        JOIN professional_regions rg ON rg.user_id=p.user_id AND rg.region_id=$3
        LEFT JOIN phones ph ON ph.user_id=u.id AND ph.is_primary
-       WHERE p.review_status='approved' AND u.status='active'
+       WHERE p.review_status='approved' AND u.status='active' AND ${accessPredicate('u.id')}
        AND NOT EXISTS (SELECT 1 FROM service_request_interests i WHERE i.request_id=$1 AND i.user_id=u.id)
        ORDER BY p.full_name NULLS LAST, u.id LIMIT 200`, [id, r.profession_id, r.region_id]) : []
   const source = (await query<Row>('SELECT contact_preference, photo_reference FROM deforafora_intake WHERE converted_request_id = $1', [id]))[0]
@@ -96,7 +97,7 @@ export async function requestDetail(id: string) {
     })),
     interested: interested.map((i) => ({
       id: i.user_id as string, name: (i.full_name ?? null) as string | null, phone: i.e164 ? formatNational(i.e164) : null, whatsapp: i.e164 ? String(i.e164).replace(/\D/g, '') : null,
-      phoneVerified: Boolean(i.verified_at), professions: (i.professions ?? []) as string[], regions: (i.regions ?? []) as string[], at: i.created_at, selectedAt: i.selected_at ?? null,
+      phoneVerified: Boolean(i.verified_at), professions: (i.professions ?? []) as string[], regions: (i.regions ?? []) as string[], at: i.created_at, selectedAt: i.selected_at ?? null, deliveredAt:i.contact_delivered_at??null, canReceive:Boolean(i.can_receive),
     })),
   }
 }
@@ -186,10 +187,19 @@ export async function selectInterest(adminId: string, id: string, userId: string
       JOIN professional_regions rg ON rg.user_id=p.user_id AND rg.region_id=$3
       WHERE p.user_id=$1 AND p.review_status='approved' AND u.status='active'`, [userId,r.profession_id,r.region_id], tx))[0]
     if (!eligible) throw new ApiError(409, 'not_eligible', 'Profissional não está mais apto para este pedido.')
+    const recharge = await getRecharge(userId,tx)
+    if(!recharge.canReceive) throw new ApiError(409,'recharge_required','Recarga de pedidos vencida.')
     // A administração só confirma por WhatsApp depois de receber o aceite explícito.
     if (!interest && confirmedViaWhatsApp) await query('INSERT INTO service_request_interests (request_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [id,userId], tx)
-    await query('UPDATE service_request_interests SET selected_at=$3 WHERE request_id=$1 AND user_id=$2', [id,userId,now()], tx)
+    await query('UPDATE service_request_interests SET selected_at=$3, recharge_cycle_id=$4 WHERE request_id=$1 AND user_id=$2', [id,userId,now(),recharge.active?recharge.cycleId:null], tx)
   })
   await audit('admin.request_professional_selected', { userId: adminId, details: { id, professionalId: userId, confirmedViaWhatsApp } })
+  return requestDetail(id)
+}
+
+export async function markDelivered(adminId:string,id:string,userId:string) {
+  const [r]=await query<Row>(`UPDATE service_request_interests i SET contact_delivered_at=COALESCE(i.contact_delivered_at,now()) FROM service_requests r WHERE i.request_id=r.id AND r.id=$1 AND i.user_id=$2 AND i.selected_at IS NOT NULL AND r.consent RETURNING i.request_id`,[id,userId])
+  if(!r) throw new ApiError(409,'not_selected','Selecione o profissional e confirme a autorização antes do repasse.')
+  await audit('admin.request_contact_delivered',{userId:adminId,details:{id,professionalId:userId}})
   return requestDetail(id)
 }

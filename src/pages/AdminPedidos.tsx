@@ -27,7 +27,7 @@ type Detail = Summary & {
   description: string; periodNote: string | null; consent: boolean; consentAt: string | null; professionSlug: string; regionSlug: string; eligible: number
   client: { name: string; phone: string; whatsapp: string }
   compatible?: { id: string; name: string | null; phone: string | null; whatsapp: string | null; phoneVerified: boolean }[]
-  interested: { id: string; name: string | null; phone: string | null; whatsapp: string | null; phoneVerified: boolean; professions: string[]; regions: string[]; at: string; selectedAt?: string | null }[]
+  interested: { id: string; name: string | null; phone: string | null; whatsapp: string | null; phoneVerified: boolean; professions: string[]; regions: string[]; at: string; selectedAt?: string | null; deliveredAt?: string | null; canReceive?: boolean }[]
 }
 const fmt = (d: string) => new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 const urgencyLabel = (u: string) => URGENCY.find((x) => x.id === u)?.label ?? u
@@ -247,7 +247,10 @@ function DetailPage() {
               <p className="text-[13px] text-muted">{p.professions.join(' · ')} · {p.regions.join(' · ')}</p>
               {p.selectedAt && <p className="mt-1 text-[13px] font-semibold text-[#2b8a00]">Selecionado para conexão · {fmt(p.selectedAt)}</p>}
               <div className="mt-2 flex flex-wrap gap-2">
-                {!p.selectedAt && d.status === 'published' && <button type="button" disabled={busy || selectedCount >= 2} onClick={() => { if (window.confirm('Selecionar este profissional para uma das duas vagas? A escolha é definitiva.')) void act(() => api.post('/admin/requests/'+d.id+'/select/'+p.id)) }} className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-[14px] font-semibold disabled:opacity-50">Selecionar</button>}
+                {!p.selectedAt && d.status === 'published' && <button type="button" disabled={busy || selectedCount >= 2 || p.canReceive===false} onClick={() => { if (window.confirm('Selecionar este profissional para uma das duas vagas? A escolha é definitiva.')) void act(() => api.post('/admin/requests/'+d.id+'/select/'+p.id)) }} className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-[14px] font-semibold disabled:opacity-50">Selecionar</button>}
+                {!p.selectedAt && p.canReceive===false && <span className="text-[13px] text-muted">Recarga vencida</span>}
+                {p.deliveredAt && <span className="text-[13px] font-semibold">Contato entregue · {fmt(p.deliveredAt)}</span>}
+                {p.selectedAt && !p.deliveredAt && d.consent && <button type="button" disabled={busy} onClick={()=>{if(window.confirm('Você já enviou o contato autorizado ao profissional?')) void act(()=>api.post('/admin/requests/'+d.id+'/delivered/'+p.id))}} className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-[14px] font-semibold">Confirmar contato entregue</button>}
                 {p.selectedAt && p.whatsapp && d.consent && <a href={waUrl(p.whatsapp, transferMessage(p.name))} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-full bg-lime px-4 text-[14px] font-semibold">Repassar contato</a>}
                 {p.whatsapp && <a href={waUrl(p.whatsapp, inviteMessage(p.name))} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25d366] px-4 text-[14px] font-semibold text-graphite"><MessageCircle size={16} aria-hidden="true" /> WhatsApp</a>}
                 <Link to={`/admin/profissionais/${p.id}`} className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-[14px] font-semibold">Abrir ficha</Link>

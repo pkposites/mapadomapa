@@ -1,3 +1,4 @@
+import RechargeCard, { type Recharge } from '../../area/RechargeCard'
 import { useEffect, useRef, useState } from 'react'
 import { Bell, CalendarDays, CheckCircle2, Inbox, MapPin, RefreshCw } from 'lucide-react'
 import AreaShell from '../../area/Shell'
@@ -12,12 +13,12 @@ const URG_CLS: Record<string, string> = { urgent: 'bg-[#fef3f2] text-[#7a271a]',
 
 /** Oportunidades reais (cadastradas pela equipe) para quem é aprovado e compatível; senão, a comunicação do lançamento. */
 export default function Pedidos() {
-  const [data, setData] = useState<{ allowed: boolean; items: Opp[] } | null>(null)
+  const [data, setData] = useState<{ allowed: boolean; items: Opp[]; recharge?:Recharge } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const load = async () => { setRefreshing(true); try { setData(await api.get<{ allowed: boolean; items: Opp[] }>('/pro/requests')); setFailed(false) } catch { setFailed(true) } finally { setRefreshing(false) } }
+  const load = async () => { setRefreshing(true); try { setData(await api.get<{ allowed: boolean; items: Opp[]; recharge?:Recharge }>('/pro/requests')); setFailed(false) } catch { setFailed(true) } finally { setRefreshing(false) } }
   useEffect(() => {
     void load()
     const refresh = () => { if (document.visibilityState === 'visible') void load() }
@@ -43,6 +44,7 @@ export default function Pedidos() {
   return (
     <AreaShell>
       <div className="flex items-center justify-between gap-3"><h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Meus Pedidos</h1><button type="button" aria-label="Atualizar pedidos" onClick={() => void load()} disabled={refreshing} className="grid size-11 place-items-center rounded-xl bg-white border border-line disabled:opacity-50"><RefreshCw size={20} aria-hidden="true" /></button></div>
+      {data?.recharge?.enabled && <div className="mt-3"><RechargeCard r={data.recharge}/></div>}
       {failed && <div className="mt-3"><Alert tone="error">Não foi possível atualizar os pedidos. Tente novamente.</Alert></div>}
       {!data && !failed && <div className="mt-10 flex justify-center"><Spinner /></div>}
 
@@ -76,19 +78,19 @@ export default function Pedidos() {
 
       {data && items.length === 0 && (
         <>
-          <section className="mt-5 rounded-3xl bg-graphite p-6 text-white">
+          {!data.allowed && <section className="mt-5 rounded-3xl bg-graphite p-6 text-white">
             <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-lime"><CalendarDays size={18} aria-hidden="true" /> {data.allowed ? 'Pedidos reais previstos' : 'Em breve'}</p>
             <p className="mt-3 text-[40px] font-bold leading-none tracking-[-0.04em]" data-testid="requests-date">{SITE.requestsOpenLabel}</p>
             <p className="mt-3 text-[16px] leading-relaxed text-on-dark">Os pedidos de orçamento estão previstos para começar nesta data. {data.allowed ? 'Quando houver pedidos compatíveis com a sua profissão e região, eles aparecem aqui antes mesmo disso.' : 'Pedidos ficam disponíveis para profissionais aprovados, da profissão e da região do pedido.'}</p>
-          </section>
+          </section>}
           <section className="mt-5 rounded-3xl bg-white p-6 text-center" aria-label="Seus pedidos">
             <Inbox size={32} strokeWidth={1.5} className="mx-auto text-muted" aria-hidden="true" />
             <p className="mt-3 text-[17px] font-semibold">Nenhum pedido ainda</p>
-            <p className="mt-1 text-[15px] leading-snug text-muted">{data.allowed ? 'Quando a equipe cadastrar um pedido compatível com você, ele aparece aqui.' : 'Mantenha seu perfil completo e aguarde a aprovação do cadastro.'}</p>
+            <p className="mt-1 text-[15px] leading-snug text-muted">{data.allowed ? (data.recharge?.canReceive===false?'Seus pedidos anteriores continuam disponíveis. Renove para receber novas oportunidades.':'Quando houver um pedido compatível, ele aparecerá aqui.') : 'Mantenha seu perfil completo e aguarde a aprovação do cadastro.'}</p>
           </section>
         </>
       )}
-      <div className="mt-5"><BoostCard /></div>
+      <details className="mt-4 rounded-2xl bg-white p-4"><summary className="font-semibold">Outras opções</summary><div className="mt-3"><BoostCard /></div></details>
     </AreaShell>
   )
 }

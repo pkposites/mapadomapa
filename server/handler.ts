@@ -15,6 +15,7 @@ import * as pro from './pro/service'
 import * as area from './pro/area'
 import * as feed from './pro/feed'
 import * as boost from './pro/boost'
+import * as recharge from './admin/recharges'
 import * as areq from './admin/requests'
 import * as intake from './admin/deforafora'
 import * as preq from './pro/requests'
@@ -141,6 +142,8 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (method === 'POST' && path === '/pro/feed') return json(await feed.createPost(me.userId, await readJson(req)))
     const fc = path.match(/^\/pro\/feed\/comments\/(\d{1,15})$/)
     if (fc && method === 'DELETE') return json(await feed.deleteOwnComment(me.userId, fc[1]))
+    const postImage = path.match(/^\/pro\/feed\/(\d{1,15})\/image$/)
+    if(postImage && method==='GET') return photoResponse(await feed.getPostImage(postImage[1]))
     const fp = path.match(/^\/pro\/feed\/(\d{1,15})(\/report|\/like|\/comments)?$/)
     if (fp && method === 'GET' && !fp[2]) return json(await feed.getPost(me.userId, fp[1]))
     if (fp && method === 'DELETE' && !fp[2]) return json(await feed.deleteOwnPost(me.userId, fp[1]))
@@ -178,6 +181,15 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   if (path.startsWith('/admin/') && path !== '/admin/ping') {
     const admin = requireAdmin(await loadSession(token))
     const m = path.match(/^\/admin\/professionals\/([0-9a-f-]{36})(\/decision|\/phone|\/messages|\/photo|\/welcome|\/whatsapp-log)?$/)
+    if(method==='GET' && path==='/admin/recharges/settings') return json(await recharge.getSettings())
+    if(method==='PUT' && path==='/admin/recharges/settings') return json(await recharge.setSettings(admin.userId,await readJson(req)))
+    const rc=path.match(/^\/admin\/recharges\/([0-9a-f-]{36})$/i)
+    if(rc && method==='GET') return json(await recharge.getRecharge(rc[1]))
+    if(rc && method==='POST') return json(await recharge.changeRecharge(admin.userId,rc[1],await readJson(req)))
+    const delivered=path.match(/^\/admin\/requests\/(\d{1,15})\/delivered\/([0-9a-f-]{36})$/i)
+    if(delivered && method==='POST') return json(await areq.markDelivered(admin.userId,delivered[1],delivered[2]))
+    const image=path.match(/^\/admin\/feed\/(\d{1,15})\/image$/)
+    if(image && method==='GET') return photoResponse(await feed.getPostImage(image[1],true))
     if (method === 'GET' && path === '/admin/stats') return json(await adm.stats())
     if (method === 'GET' && path === '/admin/professionals') return json(await adm.list({ status: url.searchParams.get('status'), q: url.searchParams.get('q'), page: url.searchParams.get('page'), phone: url.searchParams.get('phone') }))
     if (m && method === 'GET' && !m[2]) return json(await adm.detail(admin.userId, m[1], ctx.ip))

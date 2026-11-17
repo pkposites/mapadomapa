@@ -1,3 +1,4 @@
+import { RechargeControl } from '../admin/Recharge'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, BadgeCheck, ShieldAlert } from 'lucide-react'
@@ -90,6 +91,7 @@ function Page() {
       {d.reviewNotes && <p className="mt-3 rounded-2xl bg-white p-4 text-[15px]"><strong>Última observação:</strong> {d.reviewNotes}</p>}
 
       <Checklist d={d} />
+      <RechargeControl userId={d.id} approved={d.reviewStatus==='approved'} />
 
       {msg && nextId && <Link to={`/admin/profissionais/${nextId}`} onClick={() => setMsg(null)} data-testid="next-pending" className="mt-3 flex min-h-13 items-center justify-center rounded-2xl bg-graphite px-5 font-semibold text-white">Próximo cadastro em análise →</Link>}
 

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Flag, Heart, MessageCircle, PenSquare, Send, Trash2 } from 'lucide-react'
+import { Flag, Heart, ImagePlus, MessageCircle, PenSquare, Send, Trash2 } from 'lucide-react'
 import Alert from '../components/ui/Alert'
 import Avatar, { StaffBadge } from './Avatar'
 import { api, ApiError } from '../lib/api'
 
-export type Post = { id: string; title: string | null; topic: string; name: string; staff: boolean; professions: string[]; body: string; at: string; mine: boolean; likes: number; liked: boolean; comments: number }
+export type Post = { id: string; title: string | null; topic: string; name: string; staff: boolean; professions: string[]; body: string; at: string; mine: boolean; likes: number; liked: boolean; comments: number; hasImage?:boolean }
 export type Comment = { id: string; name: string; staff: boolean; professions: string[]; body: string; at: string; mine: boolean }
 export type Topic = { id: string; label: string }
 export type Access = { canInteract: boolean; canPost: boolean; needsName: boolean; isStaff: boolean; myName: string | null; lockedNote: string | null; topics: Topic[]; maxPost: number; maxComment: number }
@@ -86,9 +86,30 @@ export function CommentsBox({ postId, access, onCount }: { postId: string; acces
   )
 }
 
+async function prepareImage(file:File):Promise<string>{
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>12000000) throw new Error('Escolha uma imagem JPG, PNG ou WebP de até 12 MB.')
+  const src=URL.createObjectURL(file)
+  try{
+    const img=new Image()
+    await new Promise<void>((resolve,reject)=>{img.onload=()=>resolve();img.onerror=()=>reject(new Error('Não foi possível abrir a imagem.'));img.src=src})
+    const scale=Math.min(1,1280/Math.max(img.naturalWidth,img.naturalHeight))
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale))
+    const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Não foi possível preparar a imagem.')
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height)
+    let data=canvas.toDataURL('image/jpeg',.82)
+    if(data.length>1333330)data=canvas.toDataURL('image/jpeg',.6)
+    if(data.length>1333330)throw new Error('A imagem é muito grande. Escolha outra foto.')
+    return data
+  }finally{URL.revokeObjectURL(src)}
+}
+export function PostImage({p}:{p:Post}){
+  return p.hasImage?<img src={'/api/pro/feed/'+p.id+'/image'} alt="Imagem da publicação" loading="lazy" data-clarity-mask="true" className="mt-3 max-h-[420px] w-full rounded-xl bg-ice object-contain"/>:null
+}
 function Composer({ access, onCreated }: { access: Access; onCreated: (f: Feed) => void }) {
   const [open, setOpen] = useState(false)
   const [topic, setTopic] = useState('')
+  const [image,setImage]=useState<string|null>(null)
+  const [imageBusy,setImageBusy]=useState(false)
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -101,7 +122,7 @@ function Composer({ access, onCreated }: { access: Access; onCreated: (f: Feed) 
   const ok = topic && title.trim().length >= 3 && text.trim().length >= 3
   const publish = async () => {
     setBusy(true); setErr(null)
-    try { const f = await api.post<Feed>('/pro/feed', { topic, title, body: text }); onCreated(f); setOpen(false); setTopic(''); setTitle(''); setText('') } catch (e) { setErr(msgOf(e)) } finally { setBusy(false) }
+    try { const f = await api.post<Feed>('/pro/feed', { topic, title, body: text, image }); onCreated(f); setOpen(false); setTopic(''); setTitle(''); setText('');setImage(null) } catch (e) { setErr(msgOf(e)) } finally { setBusy(false) }
   }
   if (!open) {
     return (
@@ -121,10 +142,14 @@ function Composer({ access, onCreated }: { access: Access; onCreated: (f: Feed) 
       <label htmlFor="post-body" className="mt-4 block text-[15px] font-semibold">Texto</label>
       <textarea id="post-body" rows={5} maxLength={access.maxPost} value={text} onChange={(e) => setText(e.target.value)} placeholder="Conte os detalhes…" className="mt-2 block w-full resize-y rounded-2xl border border-line p-3 text-[16px] focus:outline-2 focus:outline-offset-2 focus:outline-graphite" />
       <p className="mt-1 text-[12px] text-muted">{text.length}/{access.maxPost}{!access.isStaff && ' · sem telefone, e-mail ou links'}</p>
+      <div className="mt-3">
+        {image?<><img src={image} alt="Prévia da foto" className="max-h-64 w-full rounded-xl object-contain bg-ice"/><button type="button" onClick={()=>setImage(null)} className="mt-1 min-h-11 text-[14px] font-semibold underline">Remover imagem</button></>:<label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line text-[14px] font-semibold"><ImagePlus size={19}/>{imageBusy?'Preparando imagem…':'Adicionar imagem'}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={imageBusy||busy} onChange={async ev=>{const f=ev.target.files?.[0];ev.target.value='';if(!f)return;setImageBusy(true);setErr(null);try{setImage(await prepareImage(f))}catch(e){setErr(e instanceof Error?e.message:'Não foi possível abrir a foto.')}finally{setImageBusy(false)}}}/></label>}
+        <p className="mt-1 text-[12px] text-muted">Evite dados pessoais, telefones e imagens sem autorização.</p>
+      </div>
       {err && <p role="alert" className="mt-2 text-[14px] font-medium text-danger">{err}</p>}
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button type="button" onClick={() => setOpen(false)} className="min-h-12 rounded-2xl border border-line font-semibold">Cancelar</button>
-        <button type="button" disabled={busy || !ok} onClick={publish} data-testid="post-send" className="min-h-12 rounded-2xl bg-lime font-semibold text-graphite disabled:opacity-60">Publicar</button>
+        <button type="button" disabled={busy || imageBusy || !ok} onClick={publish} data-testid="post-send" className="min-h-12 rounded-2xl bg-lime font-semibold text-graphite disabled:opacity-60">Publicar</button>
       </div>
     </div>
   )
@@ -180,7 +205,7 @@ export default function Mural({ compact = false }: { compact?: boolean }) {
             <Link to={`/area/mural/${p.id}`} className="mt-2 block" data-testid="post-link">
               <TopicPill topics={feed.topics} id={p.topic} />
               <p className="mt-1.5 text-[18px] font-bold leading-snug tracking-[-0.01em]">{postTitle(p)}</p>
-              {p.title && <p className="mt-1 line-clamp-3 whitespace-pre-line break-words text-[15px] leading-snug text-muted">{p.body}</p>}
+              {p.title && <p className="mt-1 line-clamp-3 whitespace-pre-line break-words text-[15px] leading-snug text-muted">{p.body}</p>}<PostImage p={p}/>
             </Link>
             <div className="mt-2 flex items-center gap-1">
               <LikeButton p={p} access={feed} update={upd} note={(t) => setMsg({ tone: 'info', text: t })} />

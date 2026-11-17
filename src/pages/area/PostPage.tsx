@@ -1,3 +1,4 @@
+import { PostImage } from '../../area/Mural'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Flag, MessageCircle, Trash2 } from 'lucide-react'
@@ -35,7 +36,7 @@ export default function PostPage() {
           </div>
           <div className="mt-3"><TopicPill topics={d.topics} id={p.topic} /></div>
           <h1 className="mt-2 text-[24px] font-bold leading-tight tracking-[-0.02em]">{postTitle(p)}</h1>
-          {p.title && <p className="mt-3 whitespace-pre-line break-words text-[17px] leading-relaxed">{p.body}</p>}
+          {p.title && <p className="mt-3 whitespace-pre-line break-words text-[17px] leading-relaxed">{p.body}</p>}<PostImage p={p}/>
           <div className="mt-3 flex items-center gap-1 border-b border-line pb-3">
             <LikeButton p={p} access={d} update={(n) => setD({ ...d, post: n })} note={(t) => setMsg({ tone: 'info', text: t })} />
             <span className="inline-flex min-h-11 items-center gap-1.5 px-3 text-[14px] font-semibold text-muted"><MessageCircle size={19} aria-hidden="true" /> {p.comments}</span>

@@ -1,6 +1,6 @@
 import { audit } from '../lib/audit'
 import { now } from '../lib/clock'
-import { query } from '../lib/db'
+import { query, withTransaction } from '../lib/db'
 import { ApiError } from '../lib/http'
 import { formatNational } from '../lib/phone'
 import { enforce } from '../lib/rateLimit'
@@ -45,7 +45,7 @@ const LIMITS = { member: { post: 600, comment: 300 }, staff: { post: 3000, comme
 const POST_SELECT = `p.id, p.title, p.topic, p.body, p.created_at, (p.user_id = $1) AS mine, pr.full_name, ${staffOf('p.user_id')} AS staff, ${prosOf('p.user_id')} AS professions,
             (SELECT count(*)::int FROM post_likes l WHERE l.post_id = p.id) AS likes,
             EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.user_id = $1) AS liked,
-            (SELECT count(*)::int FROM post_comments c WHERE c.post_id = p.id AND NOT c.hidden) AS comments`
+            (SELECT count(*)::int FROM post_comments c WHERE c.post_id = p.id AND NOT c.hidden) AS comments, EXISTS (SELECT 1 FROM post_images pi WHERE pi.post_id=p.id) AS has_image`
 // Autor visível: profissional aprovado e ativo, ou a equipe.
 const POST_FROM = `FROM posts p
      LEFT JOIN professional_profiles pr ON pr.user_id = p.user_id
@@ -55,7 +55,7 @@ const mapPost = (r: Row) => ({
   id: String(r.id), title: (r.title ?? null) as string | null, topic: r.topic as string,
   name: ((r.staff ? (r.full_name ?? STAFF_NAME) : (r.full_name ?? 'Profissional')) as string), staff: r.staff === true,
   professions: (r.professions ?? []) as string[], body: r.body as string, at: r.created_at, mine: r.mine as boolean,
-  likes: r.likes as number, liked: r.liked as boolean, comments: r.comments as number,
+  hasImage: Boolean(r.has_image), likes: r.likes as number, liked: r.liked as boolean, comments: r.comments as number,
 })
 const access = (s: Awaited<ReturnType<typeof standing>>) => ({
   allowed: true, canInteract: s.approved, canPost: s.approved && s.hasName, needsName: s.approved && !s.hasName, isStaff: s.staff,
@@ -147,7 +147,17 @@ export async function createPost(userId: string, body: Record<string, unknown>) 
   if (text.length > max) throw bad('post_too_long', `A postagem pode ter no máximo ${max} caracteres.`)
   if (!s.staff && (HAS_LINK.test(text) || HAS_PHONE.test(text) || HAS_LINK.test(title) || HAS_PHONE.test(title))) throw bad('post_contact_info', 'Por segurança, não inclua telefones, e-mails ou links na postagem.')
   if (!s.staff) await enforce(`feed:post:${userId}`, 10, 86400)
-  const [{ id }] = await query<Row>('INSERT INTO posts (user_id, title, topic, body) VALUES ($1, $2, $3, $4) RETURNING id', [userId, title, topic, text])
+  let image: Buffer | null = null
+  if(body.image != null){
+    if(typeof body.image!=='string'||body.image.length>1340000||!/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(body.image)) throw bad('invalid_image','Selecione uma imagem JPEG válida de até 1 MB.')
+    image=Buffer.from(body.image.slice('data:image/jpeg;base64,'.length),'base64')
+    if(image.length<4||image.length>1000000||image[0]!==255||image[1]!==216||image[2]!==255||image[image.length-2]!==255||image[image.length-1]!==217) throw bad('invalid_image','Não foi possível validar a imagem.')
+  }
+  const id = await withTransaction(async tx=>{
+    const [p] = await query<Row>('INSERT INTO posts (user_id,title,topic,body) VALUES ($1,$2,$3,$4) RETURNING id',[userId,title,topic,text],tx)
+    if(image) await query("INSERT INTO post_images(post_id,bytes,mime) VALUES ($1,$2,'image/jpeg')",[p.id,image],tx)
+    return p.id
+  })
   return { ...(await listFeed(userId, null)), createdId: String(id) }
 }
 
@@ -172,14 +182,14 @@ export async function adminFeed() {
   const rows = await query<Row>(
     `SELECT p.id, p.title, p.topic, p.body, p.hidden, p.hidden_reason, p.created_at, p.user_id, pr.full_name, ph.e164,
             (SELECT count(*)::int FROM post_reports r WHERE r.post_id = p.id) AS reports,
-            (SELECT count(*)::int FROM post_comments c WHERE c.post_id = p.id) AS comments
+            (SELECT count(*)::int FROM post_comments c WHERE c.post_id = p.id) AS comments, EXISTS (SELECT 1 FROM post_images pi WHERE pi.post_id=p.id) AS has_image
      FROM posts p
      LEFT JOIN professional_profiles pr ON pr.user_id = p.user_id
      LEFT JOIN phones ph ON ph.user_id = p.user_id AND ph.is_primary
      ORDER BY (SELECT count(*) FROM post_reports r WHERE r.post_id = p.id AND NOT p.hidden) DESC, p.id DESC LIMIT 100`)
   return { items: rows.map((r) => ({
     id: String(r.id), title: (r.title ?? null) as string | null, topic: r.topic as string, body: r.body as string, hidden: r.hidden as boolean, hiddenReason: r.hidden_reason as string | null, at: r.created_at,
-    reports: r.reports as number, comments: r.comments as number, authorId: r.user_id as string, authorName: r.full_name as string | null, authorPhone: r.e164 ? formatNational(r.e164) : null,
+    hasImage:Boolean(r.has_image), reports: r.reports as number, comments: r.comments as number, authorId: r.user_id as string, authorName: r.full_name as string | null, authorPhone: r.e164 ? formatNational(r.e164) : null,
   })) }
 }
 export async function adminSetHidden(adminId: string, id: string, hidden: boolean, reason: unknown) {
@@ -202,4 +212,9 @@ export async function adminHideComment(adminId: string, id: string, hidden: bool
   if (!r.length) throw new ApiError(404, 'not_found', 'Comentário não encontrado.')
   await audit('admin.comment_moderation', { userId: adminId, details: { id, hidden } })
   return adminComments(String(r[0].post_id))
+}
+
+export async function getPostImage(id:string, admin=false):Promise<{type:string;data:Buffer}|null> {
+  const [r]=await query<Row>(`SELECT pi.mime AS type,pi.bytes AS data FROM post_images pi JOIN posts p ON p.id=pi.post_id LEFT JOIN professional_profiles pr ON pr.user_id=p.user_id JOIN users u ON u.id=p.user_id WHERE p.id=$1 ${admin?'':`AND NOT p.hidden AND u.status='active' AND ${AUTHOR_OK}`}`,[id])
+  return r?{type:r.type,data:r.data}:null
 }
