@@ -16,6 +16,7 @@ import * as area from './pro/area'
 import * as feed from './pro/feed'
 import * as boost from './pro/boost'
 import * as recharge from './admin/recharges'
+import * as pix from './pro/pix'
 import * as areq from './admin/requests'
 import * as intake from './admin/deforafora'
 import * as preq from './pro/requests'
@@ -55,6 +56,8 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   const token = readCookie(req, SESSION_COOKIE)
 
   if (method !== 'GET' && method !== 'HEAD') assertSameOrigin(req)
+
+  if (method === 'POST' && path === '/integrations/mercadopago/webhook') return json(await pix.webhook(req))
 
   // Entrada exclusivamente servidor-a-servidor, autenticada por segredo de integração.
   if (method === 'GET' && path === '/integrations/deforafora/health') return json(await intake.integrationHealth(req))
@@ -132,6 +135,8 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   // ---------- Cadastro profissional (Etapa 3): exige login ----------
   if (path.startsWith('/pro/')) {
     const me = requireUser(await loadSession(token))
+    if (method==='GET' && path==='/pro/recharge/pix') return json(await pix.checkoutState(me.userId,me.roles.includes('admin'),url.searchParams.get('verify')==='1'))
+    if (method==='POST' && path==='/pro/recharge/pix') return json(await pix.createPix(me.userId,me.roles.includes('admin'),await readJson(req)))
     if (method === 'GET' && path === '/pro/catalog') return json(await pro.getCatalog())
     if (method === 'GET' && path === '/pro/profile') return json(await pro.getState(me.userId))
     if (method === 'PUT' && path === '/pro/professions') return json(await pro.setProfessions(me.userId, await readJson(req)))
