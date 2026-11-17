@@ -1,6 +1,6 @@
-import { getRecharge } from '../admin/recharges'
+import { getRecharge, accessPredicate } from '../admin/recharges'
 import { audit } from '../lib/audit'
-import { query } from '../lib/db'
+import { query, withTransaction } from '../lib/db'
 import { ApiError } from '../lib/http'
 import { enforce } from '../lib/rateLimit'
 import { URGENCY } from '../admin/requests'
@@ -24,10 +24,10 @@ export async function listOpportunities(userId: string, master = false) {
      FROM service_requests r JOIN professions p ON p.id = r.profession_id JOIN service_regions g ON g.id = r.region_id
      WHERE r.status = 'published' AND r.deleted_at IS NULL
        AND ($3::boolean OR (
-        (EXISTS (SELECT 1 FROM service_request_invites v WHERE v.request_id=r.id AND v.user_id=$1)
-          OR (r.routing_mode='automatic' AND $4::boolean AND ($2::boolean OR EXISTS (SELECT 1 FROM service_request_interests old WHERE old.request_id=r.id AND old.user_id=$1))
+        ($2::boolean AND $4::boolean AND (EXISTS (SELECT 1 FROM service_request_invites v WHERE v.request_id=r.id AND v.user_id=$1)
+          OR (r.routing_mode='automatic'
             AND EXISTS (SELECT 1 FROM profile_professions pp WHERE pp.user_id=$1 AND pp.profession_id=r.profession_id)
-            AND EXISTS (SELECT 1 FROM professional_regions pr WHERE pr.user_id=$1 AND pr.region_id=r.region_id)))
+            AND EXISTS (SELECT 1 FROM professional_regions pr WHERE pr.user_id=$1 AND pr.region_id=r.region_id))))
         AND (EXISTS (SELECT 1 FROM service_request_interests i WHERE i.request_id=r.id AND i.user_id=$1)
           OR (SELECT count(*) FROM service_request_interests i WHERE i.request_id=r.id AND i.selected_at IS NOT NULL)<2)))
      ORDER BY r.published_at DESC, r.id DESC LIMIT 100`, [userId,recharge?.canReceive??true,master,approved])
@@ -50,7 +50,17 @@ export async function showInterest(userId: string, id: string) {
   const item = (open.items as { id: string }[]).find((i) => i.id === id)
   if (!item) throw new ApiError(404, 'not_found', 'Pedido não encontrado.') // inexistente, rascunho ou fora do seu perfil
   // Chave primária composta: manifestar duas vezes é impossível (a 2ª chamada não cria nada).
-  const r = await query<Row>('INSERT INTO service_request_interests (request_id, user_id) SELECT id,$2 FROM service_requests WHERE id=$1 AND status=\'published\' AND deleted_at IS NULL ON CONFLICT DO NOTHING RETURNING request_id', [id, userId])
+  const r=await withTransaction(async tx=>{
+    await query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[userId],tx)
+    if(!(await getRecharge(userId,tx)).canReceive)throw new ApiError(403,'access_blocked','Recebimento de novos pedidos indisponível.')
+    return query<Row>(`INSERT INTO service_request_interests (request_id,user_id)
+      SELECT r.id,$2 FROM service_requests r JOIN users u ON u.id=$2
+      WHERE r.id=$1 AND r.status='published' AND r.deleted_at IS NULL AND ${accessPredicate('u.id')}
+      AND (EXISTS(SELECT 1 FROM service_request_invites v WHERE v.request_id=r.id AND v.user_id=$2)
+        OR (r.routing_mode='automatic' AND EXISTS(SELECT 1 FROM profile_professions x WHERE x.user_id=$2 AND x.profession_id=r.profession_id)
+        AND EXISTS(SELECT 1 FROM professional_regions x WHERE x.user_id=$2 AND x.region_id=r.region_id)))
+      ON CONFLICT DO NOTHING RETURNING request_id`,[id,userId],tx)
+  })
   if (r.length) await audit('pro.request_interest', { userId, details: { id } })
   return { ok: true, alreadyInterested: r.length === 0 }
 }

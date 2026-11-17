@@ -71,8 +71,8 @@ export default function Recarga() {
       <button type="button" onClick={()=>setStep(0)} className="mt-2 min-h-11 w-full text-[14px] font-semibold">Voltar ao plano</button>
     </section>}
     {step===2&&pending&&<section className="mt-4 rounded-3xl border border-line bg-white p-5 text-center" aria-live="polite">
-      <h2 className="text-[21px] font-bold">Pix gerado · {WEEKLY_PRICE_LABEL}</h2>
-      <p className="mt-2 text-[14px] text-muted">Escaneie o QR Code ou use o Pix Copia e Cola no seu banco.</p>
+      <h2 className="text-[21px] font-bold">{pay?.qrCode||pay?.qrImage?'Pix gerado':pay?.expiresAt&&Date.parse(pay.expiresAt)<=Date.now()?'Pix vencido · verificando':'Preparando Pix'} · {WEEKLY_PRICE_LABEL}</h2>
+      <p className="mt-2 text-[14px] text-muted">{pay?.qrCode||pay?.qrImage?'Escaneie o QR Code ou use o Pix Copia e Cola no seu banco.':'Aguarde a atualização do Mercado Pago. Não faça outro pagamento.'}</p>
       {pay?.qrImage&&<img alt="QR Code do Pix" src={'data:image/png;base64,'+pay.qrImage} className="mx-auto mt-4 w-full max-w-[240px] rounded-xl border border-line p-2"/>}
       {pay?.qrCode&&<><textarea readOnly value={pay.qrCode} aria-label="Pix Copia e Cola" className="mt-3 block w-full rounded-xl border border-line p-3 text-[13px]" rows={3} onFocus={e=>e.currentTarget.select()}/><button type="button" className="mt-2 min-h-12 w-full rounded-xl bg-lime font-bold" onClick={()=>void copy()}>{copied?'Código copiado!':'Copiar código Pix'}</button></>}
       <p className="mt-3 text-[13px] text-muted">Aguardando confirmação do Mercado Pago. Vencimento: {pay?.expiresAt?new Date(pay.expiresAt).toLocaleString('pt-BR'):'—'}.</p>

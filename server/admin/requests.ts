@@ -202,7 +202,9 @@ export async function selectInterest(adminId: string, id: string, userId: string
     const eligible = (await query<Row>(`SELECT 1 FROM professional_profiles p JOIN users u ON u.id=p.user_id
       WHERE p.user_id=$1 AND u.status='active' AND NOT EXISTS (SELECT 1 FROM user_roles ur JOIN roles rl ON rl.id=ur.role_id WHERE ur.user_id=u.id AND rl.name='admin')`, [userId], tx))[0]
     if (!eligible) throw new ApiError(409, 'not_eligible', 'Conta desativada ou não disponível.')
+    await query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[userId],tx)
     const recharge = await getRecharge(userId,tx)
+    if(!recharge.canReceive) throw new ApiError(409,'access_blocked','Profissional sem acesso a novos pedidos. Aprove, retome ou libere a recarga na ficha.')
     // A administração só confirma por WhatsApp depois de receber o aceite explícito.
     if (!interest && confirmedViaWhatsApp) await query('INSERT INTO service_request_interests (request_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [id,userId], tx)
     await query('UPDATE service_request_interests SET selected_at=$3, recharge_cycle_id=$4 WHERE request_id=$1 AND user_id=$2', [id,userId,now(),recharge.active?recharge.cycleId:null], tx)
@@ -238,6 +240,8 @@ export async function inviteProfessional(adminId: string, id: string, userId: st
     } else if (body.invite === true) {
       const eligible = (await query<Row>(`SELECT 1 FROM professional_profiles p JOIN users u ON u.id=p.user_id WHERE p.user_id=$1 AND u.status='active' AND NOT EXISTS (SELECT 1 FROM user_roles ur JOIN roles rl ON rl.id=ur.role_id WHERE ur.user_id=u.id AND rl.name='admin')`,[userId],tx))[0]
       if (!eligible) throw new ApiError(409,'not_eligible','Conta desativada ou não disponível.')
+      await query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[userId],tx)
+      if(!(await getRecharge(userId,tx)).canReceive) throw new ApiError(409,'access_blocked','Profissional sem acesso a novos pedidos. Aprove, retome ou libere a recarga na ficha.')
       await query('INSERT INTO service_request_invites(request_id,user_id,invited_by) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',[id,userId,adminId],tx)
     } else throw bad('invalid_invite','Escolha liberar ou retirar.')
   })
