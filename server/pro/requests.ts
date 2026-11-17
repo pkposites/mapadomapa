@@ -24,7 +24,7 @@ export async function listOpportunities(userId: string, master = false) {
      FROM service_requests r JOIN professions p ON p.id = r.profession_id JOIN service_regions g ON g.id = r.region_id
      WHERE r.status = 'published' AND r.deleted_at IS NULL
        AND ($3::boolean OR (
-        ($2::boolean AND $4::boolean AND (EXISTS (SELECT 1 FROM service_request_invites v WHERE v.request_id=r.id AND v.user_id=$1)
+        ($2::boolean AND $4::boolean AND ${accessPredicate('$1::uuid')} AND (EXISTS (SELECT 1 FROM service_request_invites v WHERE v.request_id=r.id AND v.user_id=$1)
           OR (r.routing_mode='automatic'
             AND EXISTS (SELECT 1 FROM profile_professions pp WHERE pp.user_id=$1 AND pp.profession_id=r.profession_id)
             AND EXISTS (SELECT 1 FROM professional_regions pr WHERE pr.user_id=$1 AND pr.region_id=r.region_id))))

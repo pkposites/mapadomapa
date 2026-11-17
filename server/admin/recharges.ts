@@ -4,7 +4,7 @@ import { audit } from '../lib/audit'
 import { env, isSimulationEnvironment } from '../lib/env'
 type Row = Record<string, any>
 export const pixConfigured = () => Boolean(env('MERCADO_PAGO_ACCESS_TOKEN') && env('MERCADO_PAGO_WEBHOOK_SECRET') && env('APP_ENV') !== 'staging' && !isSimulationEnvironment())
-export const accessPredicate = (col: string) => `(NOT EXISTS (SELECT 1 FROM request_access_pauses p WHERE p.user_id=${col}) AND EXISTS (SELECT 1 FROM professional_profiles p JOIN users u ON u.id=p.user_id WHERE p.user_id=${col} AND p.review_status='approved' AND u.status='active') AND (NOT EXISTS (SELECT 1 FROM request_access_settings WHERE id=1 AND enabled) OR EXISTS (SELECT 1 FROM request_recharge_cycles c WHERE c.user_id=${col} AND c.revoked_at IS NULL AND c.starts_at<=now() AND c.expires_at>now())))`
+export const accessPredicate = (col: string) => `(NOT EXISTS (SELECT 1 FROM request_access_pauses p WHERE p.user_id=${col}) AND EXISTS (SELECT 1 FROM professional_profiles ap JOIN users au ON au.id=ap.user_id WHERE ap.user_id=${col} AND ap.review_status='approved' AND au.status='active') AND (NOT EXISTS (SELECT 1 FROM request_access_settings WHERE id=1 AND enabled) OR EXISTS (SELECT 1 FROM request_recharge_cycles c WHERE c.user_id=${col} AND c.revoked_at IS NULL AND c.starts_at<=now() AND c.expires_at>now())))`
 export async function getSettings(tx?: Parameters<typeof query>[2]) {
   const [s] = await query<Row>('SELECT enabled,pix_enabled FROM request_access_settings WHERE id=1', [], tx)
   return { enabled: Boolean(s?.enabled), pixEnabled: Boolean(s?.pix_enabled), pixConfigured: pixConfigured() && env('MERCADO_PAGO_PIX_ENABLED') !== 'false' }
