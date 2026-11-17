@@ -57,6 +57,7 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   if (method !== 'GET' && method !== 'HEAD') assertSameOrigin(req)
 
   // Entrada exclusivamente servidor-a-servidor, autenticada por segredo de integração.
+  if (method === 'GET' && path === '/integrations/deforafora/health') return json(await intake.integrationHealth(req))
   if (method === 'POST' && path === '/integrations/deforafora') return json(await intake.receiveDeforafora(req), 201)
 
   // ---------- Rotas só do ambiente local (simulador de SMS e utilitários de teste) ----------
@@ -207,6 +208,11 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if (m && method === 'POST' && m[2] === '/welcome') return json(await adm.sendWelcome(admin.userId, m[1], (await readJson(req)).body))
     if (method === 'GET' && path === '/admin/welcome') return json(await adm.welcomeInfo())
     if (method === 'POST' && path === '/admin/welcome-all') return json(await adm.sendWelcomeAll(admin.userId, (await readJson(req)).body))
+    if (method === 'POST' && path === '/admin/requests/intake/import') return json(await intake.importIntake(await readJson(req)))
+    const routing = path.match(/^\/admin\/requests\/(\d+)\/routing$/)
+    if (routing && method === 'POST') return json(await areq.setRouting(admin.userId,routing[1],await readJson(req)))
+    const invite = path.match(/^\/admin\/requests\/(\d+)\/invite\/([0-9a-fA-F-]{36})$/)
+    if (invite && method === 'POST') return json(await areq.inviteProfessional(admin.userId,invite[1],invite[2],await readJson(req)))
     if (method === 'GET' && path === '/admin/requests/intake') return json(await intake.listIntake())
     const it = path.match(/^\/admin\/requests\/intake\/([a-zA-Z0-9-]{10,100})(\/convert)?$/)
     if (it && method === 'GET' && !it[2]) return json(await intake.intakeDetail(it[1]))

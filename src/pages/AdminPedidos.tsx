@@ -23,10 +23,11 @@ type IntakeItem = {
 type IntakeDetail = IntakeItem & { client_phone: string; description: string; photo_reference: string | null; converted_request_id: string | null }
 const normalized = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
 type Detail = Summary & {
+  routingMode: 'manual' | 'automatic'
   origin?: string | null; contactPreference?: string | null; photoReference?: string | null
   description: string; periodNote: string | null; consent: boolean; consentAt: string | null; professionSlug: string; regionSlug: string; eligible: number
   client: { name: string; phone: string; whatsapp: string }
-  compatible?: { id: string; name: string | null; phone: string | null; whatsapp: string | null; phoneVerified: boolean }[]
+  compatible?: { id: string; name: string | null; phone: string | null; whatsapp: string | null; phoneVerified: boolean; score: number | null; completeness: number; invited: boolean; professionMatch: boolean; regionMatch: boolean; canReceive: boolean; reviewStatus: string }[]
   interested: { id: string; name: string | null; phone: string | null; whatsapp: string | null; phoneVerified: boolean; professions: string[]; regions: string[]; at: string; selectedAt?: string | null; deliveredAt?: string | null; canReceive?: boolean }[]
 }
 const fmt = (d: string) => new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
@@ -43,9 +44,29 @@ function Shell({ title, back, children }: { title: string; back: string; childre
 
 // ---------- Lista ----------
 export function AdminPedidos() { return <AdminGate><List /></AdminGate> }
+// Netlify Forms CSV: handles escaped quotes, line breaks and BOM.
+function intakeCsv(raw: string) {
+  const rows: string[][] = []; let row: string[] = [], val = '', quoted = false
+  for (let i=0; i<raw.length; i++) {
+    const ch=raw[i]
+    if (ch==='"') { if (quoted && raw[i+1]==='"') { val+='"'; i++ } else quoted=!quoted }
+    else if (!quoted && ch===',') { row.push(val); val='' }
+    else if (!quoted && (ch==='\n'||ch==='\r')) { if (ch==='\r'&&raw[i+1]==='\n') i++; row.push(val); rows.push(row); row=[];val='' }
+    else val+=ch
+  }
+  if (row.length||val) { row.push(val); rows.push(row) }
+  if (quoted || !rows.length) throw new Error('CSV inválido.')
+  const headers=rows.shift()!.map(x=>x.replace(/^\uFEFF/,'').trim())
+  if (!headers.includes('request_id') || !headers.includes('autorizacao')) throw new Error('Exportação Netlify inválida: faltam request_id ou autorizacao.')
+  const fields=['request_id','nome','telefone','servico','descricao','local','prazo','preferencia_contato','autorizacao','foto']
+  return rows.filter(x=>x.some(Boolean)).map(r=>Object.fromEntries(fields.map(k=>[k,r[headers.indexOf(k)]??''])))
+}
 function Incoming() {
   const [incoming, setIncoming] = useState<{ count: number; items: IntakeItem[] } | null>(null)
   const [failed, setFailed] = useState(false)
+  const [importing,setImporting]=useState(false)
+  const [importMessage,setImportMessage]=useState('')
+  async function recover(file: File) { setImporting(true); setImportMessage(''); try { const items=intakeCsv(await file.text()); const totals={imported:0,duplicates:0,rejected:0}; for(let i=0;i<items.length;i+=10){const r=await api.post<typeof totals>('/admin/requests/intake/import',{items:items.slice(i,i+10)});totals.imported+=r.imported;totals.duplicates+=r.duplicates;totals.rejected+=r.rejected} setImportMessage(`${totals.imported} importado(s) · ${totals.duplicates} já existente(s) · ${totals.rejected} inválido(s).`);refresh() } catch(e){setImportMessage(e instanceof Error?e.message:'Importação não concluída.')} finally{setImporting(false)} }
   const refresh = () => { setFailed(false); api.get<{count:number; items:IntakeItem[]}>('/admin/requests/intake').then(setIncoming).catch(() => setFailed(true)) }
   useEffect(refresh, [])
   return <section className="mt-5 rounded-3xl bg-white p-4">
@@ -53,6 +74,7 @@ function Incoming() {
       <div><h2 className="text-[18px] font-bold">Novos pedidos · De fora a fora</h2><p className="text-[13px] text-muted">Aguardando sua revisão</p></div>
       <button type="button" className="min-h-11 rounded-xl border border-line px-3 font-semibold" onClick={refresh}>Atualizar</button>
     </div>
+    <details className="mt-3 rounded-xl bg-ice p-3"><summary className="cursor-pointer text-[14px] font-semibold">Recuperar pedidos salvos no Netlify</summary><p className="mt-2 text-[13px] text-muted">Exporte o formulário solicitacao-orcamento em CSV e importe aqui. Registros repetidos são ignorados.</p><a className="mt-2 block text-[14px] font-semibold underline" href="https://app.netlify.com/projects/deforafora-app/forms" target="_blank" rel="noopener noreferrer">Abrir Netlify Forms</a><label className="mt-3 block text-[14px] font-semibold">{importing?'Importando...':'Selecionar arquivo CSV'}<input type="file" accept=".csv,text/csv" disabled={importing} className="mt-2 block w-full text-[14px]" onChange={e=>{const f=e.target.files?.[0];if(f)void recover(f);e.target.value=''}}/></label>{importMessage&&<p className="mt-2 text-[14px]" role="status">{importMessage}</p>}</details>
     {failed ? <p className="mt-3 text-[14px] text-muted">Não foi possível carregar os pedidos. Tente atualizar.</p> : !incoming ? <div className="mt-3"><Spinner /></div> : <>
       <p className="mt-3 text-[15px] font-semibold">{incoming.count} pedido(s) novo(s)</p>
       {!incoming.count && <p className="mt-2 text-[14px] text-muted">Nenhum novo pedido por enquanto.</p>}
@@ -74,7 +96,7 @@ function List() {
   useEffect(() => { setData(null); api.get<{ items: Summary[]; counts: Record<string, number> }>(`/admin/requests?status=${tab}`).then(setData).catch(() => setData({ items: [], counts: {} })) }, [tab])
   return (
     <Shell title="Pedidos de Serviços" back="/admin">
-      <p className="mt-1 text-[15px] text-muted">Cadastre pedidos reais recebidos de clientes. Só profissionais aprovados, da profissão e da região, veem o pedido.</p>
+      <p className="mt-1 text-[15px] text-muted">Cadastre pedidos reais recebidos de clientes. Você controla quem recebe cada pedido.</p>
       <Link to="/admin/pedidos/novo" data-testid="new-request" className="mt-4 flex min-h-13 items-center justify-center gap-2 rounded-2xl bg-lime px-5 font-semibold text-graphite"><Plus size={20} aria-hidden="true" /> Novo pedido</Link>
       <Incoming />
       <div className="mt-4 grid grid-cols-3 gap-2" role="group" aria-label="Situação">
@@ -166,7 +188,7 @@ function Form() {
           <span><strong>O cliente autorizou</strong> o registro e o uso dos dados necessários para a intermediação deste serviço. (Obrigatório para publicar.)</span></label>
         {err && <Alert tone="error">{err}</Alert>}
         <div className="space-y-2">
-          <SubmitButton type="button" loading={busy === 'publish'} disabled={!complete || !f.consent || busy !== null} onClick={() => save(true)} data-testid="publish">Publicar para os profissionais</SubmitButton>
+          <SubmitButton type="button" loading={busy === 'publish'} disabled={!complete || !f.consent || busy !== null} onClick={() => save(true)} data-testid="publish">Publicar e escolher profissionais</SubmitButton>
           <SubmitButton type="button" variant="ghost" className="border border-line" loading={busy === 'draft'} disabled={!complete || busy !== null} onClick={() => save(false)} data-testid="save-draft">Salvar como rascunho</SubmitButton>
         </div>
       </form>
@@ -181,15 +203,20 @@ function DetailPage() {
   const [d, setD] = useState<Detail | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [sort,setSort]=useState('score')
+  const [matchOnly,setMatchOnly]=useState(false)
+  const [minScore,setMinScore]=useState('')
+  const [minComplete,setMinComplete]=useState('0')
+  const [searchName,setSearchName]=useState('')
   const load = () => api.get<Detail>(`/admin/requests/${id}`).then(setD).catch((e) => setErr(e instanceof ApiError ? e.message : 'Não foi possível carregar.'))
   useEffect(() => { void load() }, [id])
   const act = async (fn: () => Promise<unknown>) => { setBusy(true); setErr(null); try { await fn(); await load() } catch (e) { setErr(e instanceof ApiError ? e.message : 'Algo deu errado.') } finally { setBusy(false) } }
   if (!d) return <Shell title="Pedido" back="/admin/pedidos">{err ? <div className="mt-4"><Alert tone="error">{err}</Alert></div> : <div className="mt-10 flex justify-center"><Spinner /></div>}</Shell>
   const selectedCount = d.interested.filter(p => p.selectedAt).length
-  const compatible = d.compatible ?? []
+  const compatible = (d.compatible ?? []).filter(p=>(!matchOnly || (p.professionMatch&&p.regionMatch)) && (!minScore || (p.score!==null&&p.score>=Number(minScore))) && p.completeness>=Number(minComplete) && normalized(p.name??'').includes(normalized(searchName))).sort((a,b)=>sort==='score'?(b.score??-1)-(a.score??-1):sort==='complete'?b.completeness-a.completeness:(a.name??'').localeCompare(b.name??''))
   const requestUrl = 'https://mapadomapa.netlify.app/area/pedidos#pedido-' + d.id
   const serviceText = `Serviço: ${d.title}\nDescrição: ${d.description}\nLocal: ${d.neighborhood}, ${d.region}\nPrazo: ${urgencyLabel(d.urgency)}${d.periodNote ? ' · '+d.periodNote : ''}`
-  const inviteMessage = (name: string | null) => personalize(`Olá, [nome]! Aqui é a equipe do Mapa do Mapa. Temos um pedido compatível com seu perfil.\n\n${serviceText}\n\nVocê tem disponibilidade para atender? Responda esta mensagem ou acesse: ${requestUrl}\n\nA conexão com o cliente será feita após confirmação.`, name)
+  const inviteMessage = (name: string | null) => personalize(`Olá, [nome]! Aqui é a equipe do Mapa do Mapa. Temos um pedido de serviço para você.\n\n${serviceText}\n\nVocê tem disponibilidade para atender? Responda esta mensagem ou acesse: ${requestUrl}\n\nA conexão com o cliente será feita após confirmação.`, name)
   const transferMessage = (name: string | null) => personalize(`Olá, [nome]! Você foi selecionado para este pedido:\n\n${serviceText}\n\nCliente: ${d.client.name}\nTelefone: ${d.client.phone}\nPreferência de contato: ${d.contactPreference ?? 'confirme com o cliente'}.\n\nEntre em contato para combinar o orçamento.`, name)
   const clientMsg = personalize(`Olá, [nome]! Aqui é a equipe ${d.origin === 'De fora a fora' ? 'do De fora a fora' : 'do Mapa do Mapa'}. Sobre o seu pedido "${d.title}": ${selectedCount ? 'temos profissionais selecionados para conversar com você.' : 'recebemos sua solicitação e estamos verificando a disponibilidade.'}`, d.client.name)
   return (
@@ -202,7 +229,7 @@ function DetailPage() {
         <p className="mt-2 whitespace-pre-line text-[15px] leading-snug">{d.description}</p>
         <p className="mt-3 text-[14px]"><strong>Urgência:</strong> {urgencyLabel(d.urgency)}{d.periodNote ? ` · ${d.periodNote}` : ''}</p>
         <p className="mt-1 text-[14px] text-muted">{d.publishedAt ? `Publicado em ${fmt(d.publishedAt)}` : 'Ainda não publicado'}{d.closedAt ? ` · encerrado em ${fmt(d.closedAt)}` : ''}</p>
-        <p className="mt-3 rounded-2xl bg-ice p-3 text-[14px] leading-snug" data-testid="eligible"><strong>{d.eligible}</strong> profissional(is) aprovado(s) de {d.profession} em {d.region} {d.status === 'published' ? 'podem ver este pedido' : 'poderão ver este pedido quando for publicado'}.</p>
+        <p className="mt-3 rounded-2xl bg-ice p-3 text-[14px] leading-snug" data-testid="eligible"><strong>{d.eligible}</strong> profissional(is) aprovado(s) de {d.profession} em {d.region} correspondem aos critérios automáticos. A decisão de encaminhamento é sua.</p>
       </section>
 
       <section className="mt-4 rounded-3xl bg-white p-5" data-testid="request-client">
@@ -217,14 +244,18 @@ function DetailPage() {
       {d.status === 'published' && selectedCount < 2 && (
         <section className="mt-4 rounded-3xl border-2 border-graphite bg-white p-5" data-testid="urgent-contact">
           <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Clock size={20} className="text-[#b45309]" aria-hidden="true" /><h2 className="text-[18px] font-bold">Acionar profissionais</h2></div><button type="button" disabled={busy} onClick={() => void load()} aria-label="Atualizar interessados e profissionais" className="grid size-11 shrink-0 place-items-center rounded-xl border border-line"><RefreshCw size={18} aria-hidden="true" /></button></div>
-          {d.interested.length === 0 && <div className="mt-3 rounded-2xl bg-[#fff4db] p-3 text-[14px] font-semibold text-[#7a5a00]">Ninguém respondeu ainda. Acione os profissionais compatíveis pelo WhatsApp.</div>}
-          <p className="mt-3 text-[14px] text-muted">Profissionais aprovados da mesma profissão e região que ainda não responderam. O WhatsApp abre com todos os detalhes do serviço, sem os dados privados do cliente.</p>
+          {d.interested.length === 0 && <div className="mt-3 rounded-2xl bg-[#fff4db] p-3 text-[14px] font-semibold text-[#7a5a00]">Ninguém respondeu ainda. Escolha os profissionais ou acione pelo WhatsApp.</div>}
+          <p className="mt-3 text-[14px] text-muted">Escolha livremente contas ativas. Pontuação, perfil e compatibilidade são referências, não bloqueios. O convite não revela os dados privados do cliente.</p>
+          <div className="mt-3 rounded-xl bg-ice p-3"><p className="text-[14px] font-bold">Distribuição: {d.routingMode==='manual'?'Manual — apenas convidados':'Automática + convites'}</p><button disabled={busy} type="button" className="mt-2 min-h-11 rounded-xl border border-line bg-white px-3 text-[14px] font-semibold" onClick={()=>{if(window.confirm('Alterar a distribuição deste pedido?'))void act(()=>api.post('/admin/requests/'+d.id+'/routing',{mode:d.routingMode==='manual'?'automatic':'manual'}))}}>{d.routingMode==='manual'?'Ativar distribuição automática':'Usar seleção manual'}</button></div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[14px]"><label className="col-span-2">Buscar profissional<input value={searchName} onChange={e=>setSearchName(e.target.value)} className={field} placeholder="Nome"/></label><label>Ordenar por<select className={field} value={sort} onChange={e=>setSort(e.target.value)}><option value="score">Pontuação</option><option value="complete">Perfil completo</option><option value="name">Nome</option></select></label><label>Nota mínima<input type="number" min="0" value={minScore} onChange={e=>setMinScore(e.target.value)} className={field} placeholder="Todas"/></label><label>Perfil mínimo<select className={field} value={minComplete} onChange={e=>setMinComplete(e.target.value)}><option value="0">Todos</option><option value="3">3 de 6 campos</option><option value="5">5 de 6 campos</option><option value="6">Completo</option></select></label><label className="flex items-center gap-2"><input type="checkbox" checked={matchOnly} onChange={e=>setMatchOnly(e.target.checked)}/> Só compatíveis</label></div>
           <p className="mt-3 text-[15px] font-bold">{compatible.length} profissional(is) para convite</p>
-          {compatible.length === 0 && <p className="mt-2 text-[14px] text-muted">Não há outros profissionais compatíveis para acionar.</p>}
+          {compatible.length === 0 && <p className="mt-2 text-[14px] text-muted">Nenhum profissional para esses filtros.</p>}
           <ul className="mt-2 divide-y divide-line">{compatible.map(p => <li key={p.id} className="py-3">
             <p className="text-[16px] font-semibold">{p.name ?? 'Sem nome'}</p>
             <p className="text-[14px] text-muted">{p.phone ?? 'Sem telefone'}{p.phoneVerified ? ' · verificado' : ' · não verificado'}</p>
+            <p className="mt-1 text-[13px] text-muted">Nota: {p.score??'—'} · Perfil: {p.completeness}/6 · {p.professionMatch&&p.regionMatch?'Compatível':'Fora dos critérios automáticos'} · {p.canReceive?'Acesso a pedidos':'Sem recarga ativa'}</p>
             <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" disabled={busy} onClick={()=>void act(()=>api.post('/admin/requests/'+d.id+'/invite/'+p.id,{invite:!p.invited}))} className={'min-h-12 rounded-xl px-4 text-[14px] font-bold '+(p.invited?'border border-line':'bg-lime')}>{p.invited?'Liberado · retirar':'Liberar pedido no app'}</button>
               {p.whatsapp && <a href={waUrl(p.whatsapp, inviteMessage(p.name))} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#25d366] px-4 font-bold text-graphite"><MessageCircle size={18} aria-hidden="true" /> Enviar pedido</a>}
               <Link to={`/admin/profissionais/${p.id}`} className="inline-flex min-h-12 items-center rounded-xl border border-line px-4 text-[14px] font-semibold">Ver ficha</Link>
               {p.whatsapp && <button type="button" disabled={busy} onClick={() => { if (window.confirm('Este profissional confirmou que tem interesse pelo WhatsApp? A seleção ocupa uma das duas vagas e permite o repasse do contato.')) void act(() => api.post('/admin/requests/'+d.id+'/select-confirmed/'+p.id)) }} className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-graphite px-4 text-[14px] font-semibold disabled:opacity-50">Confirmou pelo WhatsApp · Selecionar</button>}
@@ -238,7 +269,7 @@ function DetailPage() {
         <section className="mt-4 rounded-3xl bg-white p-5" data-testid="interested">
           <h2 className="text-[17px] font-bold">Profissionais interessados ({d.interested.length})</h2>
           <p className="mt-2 text-[14px] font-semibold">Selecionados: {selectedCount}/2</p>
-          <p className="text-[13px] text-muted">O primeiro interesse tem prioridade. Confirme a disponibilidade antes de selecionar; só compartilhe o contato com os dois selecionados.</p>
+          <p className="text-[13px] text-muted">Você escolhe quem será selecionado. Confirme a disponibilidade antes de selecionar; só compartilhe o contato com os dois selecionados.</p>
           {d.interested.length === 0 && <p className="mt-2 text-[15px] text-muted">Ninguém manifestou interesse ainda.</p>}
           <ul className="mt-2 divide-y divide-line">{d.interested.map((p) => (
             <li key={p.id} className="py-3" data-testid="interested-row">
@@ -247,7 +278,7 @@ function DetailPage() {
               <p className="text-[13px] text-muted">{p.professions.join(' · ')} · {p.regions.join(' · ')}</p>
               {p.selectedAt && <p className="mt-1 text-[13px] font-semibold text-[#2b8a00]">Selecionado para conexão · {fmt(p.selectedAt)}</p>}
               <div className="mt-2 flex flex-wrap gap-2">
-                {!p.selectedAt && d.status === 'published' && <button type="button" disabled={busy || selectedCount >= 2 || p.canReceive===false} onClick={() => { if (window.confirm('Selecionar este profissional para uma das duas vagas? A escolha é definitiva.')) void act(() => api.post('/admin/requests/'+d.id+'/select/'+p.id)) }} className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-[14px] font-semibold disabled:opacity-50">Selecionar</button>}
+                {!p.selectedAt && d.status === 'published' && <button type="button" disabled={busy || selectedCount >= 2} onClick={() => { if (window.confirm('Selecionar este profissional para uma das duas vagas? A escolha é definitiva.')) void act(() => api.post('/admin/requests/'+d.id+'/select/'+p.id)) }} className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-[14px] font-semibold disabled:opacity-50">Selecionar</button>}
                 {!p.selectedAt && p.canReceive===false && <span className="text-[13px] text-muted">Recarga vencida</span>}
                 {p.deliveredAt && <span className="text-[13px] font-semibold">Contato entregue · {fmt(p.deliveredAt)}</span>}
                 {p.selectedAt && !p.deliveredAt && d.consent && <button type="button" disabled={busy} onClick={()=>{if(window.confirm('Você já enviou o contato autorizado ao profissional?')) void act(()=>api.post('/admin/requests/'+d.id+'/delivered/'+p.id))}} className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-[14px] font-semibold">Confirmar contato entregue</button>}
@@ -261,7 +292,7 @@ function DetailPage() {
 
       <div className="mt-5 space-y-2">
         {d.status === 'draft' && <>
-          {d.consent && <SubmitButton type="button" loading={busy} onClick={() => act(() => api.post(`/admin/requests/${d.id}/publish`))} data-testid="publish-now">Publicar para os profissionais</SubmitButton>}
+          {d.consent && <SubmitButton type="button" loading={busy} onClick={() => act(() => api.post(`/admin/requests/${d.id}/publish`))} data-testid="publish-now">Publicar e escolher profissionais</SubmitButton>}
           <Link to={`/admin/pedidos/${d.id}/editar`} className="flex min-h-13 items-center justify-center rounded-2xl border border-line bg-white font-semibold">Editar rascunho</Link>
           <SubmitButton type="button" variant="ghost" className="border border-line" loading={busy} onClick={() => { if (window.confirm('Excluir este rascunho?')) void act(async () => { await api.del(`/admin/requests/${d.id}`); navigate('/admin/pedidos', { replace: true }) }) }}>Excluir rascunho</SubmitButton>
         </>}

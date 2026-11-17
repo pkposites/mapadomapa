@@ -7,7 +7,7 @@ type Row = Record<string, any>
 const clean = (v: unknown, max: number) => typeof v === 'string' ? v.trim().slice(0, max) : ''
 const validId = (id: string) => /^[a-zA-Z0-9-]{10,100}$/.test(id)
 
-export async function receiveDeforafora(req: Request) {
+function assertIntegration(req: Request) {
   const secret = env('DFF_MAPA_INTAKE_031439B60533')
   const auth = req.headers.get('authorization') ?? ''
   const expected = 'Bearer ' + (secret ?? '')
@@ -15,14 +15,27 @@ export async function receiveDeforafora(req: Request) {
   if (!secret || secret.length < 32 || a.length !== b.length || !timingSafeEqual(a, b)) {
     throw new ApiError(401, 'invalid_integration', 'Integração não autorizada.')
   }
+}
+
+export async function integrationHealth(req: Request) {
+  assertIntegration(req)
+  await query('SELECT 1 FROM deforafora_intake LIMIT 1')
+  return { ok: true }
+}
+
+export async function receiveDeforafora(req: Request) {
+  assertIntegration(req)
   if (Number(req.headers.get('content-length') ?? 0) > 30000) throw new ApiError(413, 'too_large', 'Pedido muito grande.')
-  const body = await readJson(req)
+  return storeIntake(await readJson(req))
+}
+
+async function storeIntake(body: Record<string, unknown>) {
   const id = clean(body.request_id, 100)
   if (!validId(id) || body.autorizacao !== 'Sim') throw new ApiError(400, 'invalid_request', 'Pedido inválido ou sem autorização.')
   const name = clean(body.nome, 100), phone = clean(body.telefone, 40)
   const service = clean(body.servico, 150), description = clean(body.descricao, 5000), location = clean(body.local, 250)
   const urgency = clean(body.prazo, 100), preference = clean(body.preferencia_contato, 60)
-  if (!name || !phone || !service || !description || !location || !urgency || !preference) throw new ApiError(400, 'missing_fields', 'Pedido incompleto.')
+  if (!name || !/^\d{10,13}$/.test(phone.replace(/\D/g,'')) || !service || !description || !location || !urgency || !preference) throw new ApiError(400, 'missing_fields', 'Pedido incompleto.')
   // A referência da foto permanece privada. Não se copia a foto ou o contato para a oportunidade pública.
   const photo = clean(body.foto, 2000) || null
   const rows = await query<Row>(`INSERT INTO deforafora_intake
@@ -44,4 +57,17 @@ export async function intakeDetail(id: string) {
   const row = (await query<Row>('SELECT * FROM deforafora_intake WHERE id = $1', [id]))[0]
   if (!row) throw new ApiError(404, 'not_found', 'Pedido não encontrado.')
   return row
+}
+
+export async function importIntake(body: Record<string, unknown>) {
+  if (!Array.isArray(body.items) || body.items.length > 200) throw new ApiError(400,'invalid_import','Selecione até 200 registros por importação.')
+  let imported=0, duplicates=0, rejected=0
+  for (const item of body.items) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) { rejected++; continue }
+    try {
+      const result = await storeIntake(item as Record<string,unknown>)
+      if (result.duplicate) duplicates++; else imported++
+    } catch(e) { if (e instanceof ApiError) rejected++; else throw e }
+  }
+  return { imported, duplicates, rejected }
 }

@@ -76,24 +76,33 @@ export async function requestDetail(id: string) {
      LEFT JOIN professional_profiles pr ON pr.user_id = u.id LEFT JOIN phones ph ON ph.user_id = u.id AND ph.is_primary
      WHERE i.request_id = $1 ORDER BY i.created_at`, [id])
   const compatible = r.status === 'published' ? await query<Row>(
-    `SELECT DISTINCT u.id AS user_id, p.full_name, ph.e164, ph.verified_at
+    `SELECT u.id AS user_id, p.full_name, ph.e164, ph.verified_at, p.review_status,
+       (SELECT max(t.technical_score) FROM technical_assessments t WHERE t.user_id=u.id) AS score,
+       (SELECT count(*) FROM service_request_invites v WHERE v.request_id=$1 AND v.user_id=u.id)>0 AS invited,
+       EXISTS (SELECT 1 FROM profile_professions pp WHERE pp.user_id=u.id AND pp.profession_id=$2) AS profession_match,
+       EXISTS (SELECT 1 FROM professional_regions rg WHERE rg.user_id=u.id AND rg.region_id=$3) AS region_match,
+       (CASE WHEN NULLIF(trim(p.full_name),'') IS NOT NULL THEN 1 ELSE 0 END
+        + CASE WHEN NULLIF(trim(p.bio),'') IS NOT NULL THEN 1 ELSE 0 END
+        + CASE WHEN NULLIF(trim(p.services),'') IS NOT NULL THEN 1 ELSE 0 END
+        + CASE WHEN EXISTS (SELECT 1 FROM profile_photos x WHERE x.user_id=u.id) THEN 1 ELSE 0 END
+        + CASE WHEN EXISTS (SELECT 1 FROM profile_professions x WHERE x.user_id=u.id) THEN 1 ELSE 0 END
+        + CASE WHEN EXISTS (SELECT 1 FROM professional_regions x WHERE x.user_id=u.id) THEN 1 ELSE 0 END) AS completeness,
+       ${accessPredicate('u.id')} AS can_receive
        FROM professional_profiles p JOIN users u ON u.id=p.user_id
-       JOIN profile_professions pp ON pp.user_id=p.user_id AND pp.profession_id=$2
-       JOIN professional_regions rg ON rg.user_id=p.user_id AND rg.region_id=$3
        LEFT JOIN phones ph ON ph.user_id=u.id AND ph.is_primary
-       WHERE p.review_status='approved' AND u.status='active' AND ${accessPredicate('u.id')}
+       WHERE u.status='active' AND NOT EXISTS (SELECT 1 FROM user_roles ur JOIN roles rl ON rl.id=ur.role_id WHERE ur.user_id=u.id AND rl.name='admin')
        AND NOT EXISTS (SELECT 1 FROM service_request_interests i WHERE i.request_id=$1 AND i.user_id=u.id)
-       ORDER BY p.full_name NULLS LAST, u.id LIMIT 200`, [id, r.profession_id, r.region_id]) : []
+       ORDER BY p.full_name NULLS LAST, u.id`, [id, r.profession_id, r.region_id]) : []
   const source = (await query<Row>('SELECT contact_preference, photo_reference FROM deforafora_intake WHERE converted_request_id = $1', [id]))[0]
   return {
-    ...summary(r), origin: source ? 'De fora a fora' : null, contactPreference: source?.contact_preference ?? null, photoReference: source?.photo_reference ?? null, description: r.description as string, periodNote: r.period_note as string | null, consent: r.consent as boolean, consentAt: r.consent_at,
+    ...summary(r), routingMode: r.routing_mode, origin: source ? 'De fora a fora' : null, contactPreference: source?.contact_preference ?? null, photoReference: source?.photo_reference ?? null, description: r.description as string, periodNote: r.period_note as string | null, consent: r.consent as boolean, consentAt: r.consent_at,
     professionSlug: r.profession_slug as string, regionSlug: r.region_slug as string,
     client: { name: r.client_name as string, phone: formatNational(r.client_phone), whatsapp: String(r.client_phone).replace(/\D/g, '') },
     eligible: await eligibleCount(r.profession_id, r.region_id), urgencyOptions: URGENCY,
     compatible: compatible.map((i) => ({
       id: i.user_id as string, name: (i.full_name ?? null) as string | null,
       phone: i.e164 ? formatNational(i.e164) : null, whatsapp: i.e164 ? String(i.e164).replace(/\D/g, '') : null,
-      phoneVerified: Boolean(i.verified_at),
+      phoneVerified: Boolean(i.verified_at), score: i.score == null ? null : Number(i.score), completeness: Number(i.completeness), invited: Boolean(i.invited), professionMatch: Boolean(i.profession_match), regionMatch: Boolean(i.region_match), canReceive: Boolean(i.can_receive), reviewStatus: i.review_status,
     })),
     interested: interested.map((i) => ({
       id: i.user_id as string, name: (i.full_name ?? null) as string | null, phone: i.e164 ? formatNational(i.e164) : null, whatsapp: i.e164 ? String(i.e164).replace(/\D/g, '') : null,
@@ -183,12 +192,9 @@ export async function selectInterest(adminId: string, id: string, userId: string
     const [{ n }] = await query<Row>('SELECT count(*)::int AS n FROM service_request_interests WHERE request_id = $1 AND selected_at IS NOT NULL', [id], tx)
     if (n >= 2) throw new ApiError(409, 'selection_limit', 'Já foram selecionados dois profissionais.')
     const eligible = (await query<Row>(`SELECT 1 FROM professional_profiles p JOIN users u ON u.id=p.user_id
-      JOIN profile_professions pp ON pp.user_id=p.user_id AND pp.profession_id=$2
-      JOIN professional_regions rg ON rg.user_id=p.user_id AND rg.region_id=$3
-      WHERE p.user_id=$1 AND p.review_status='approved' AND u.status='active'`, [userId,r.profession_id,r.region_id], tx))[0]
-    if (!eligible) throw new ApiError(409, 'not_eligible', 'Profissional não está mais apto para este pedido.')
+      WHERE p.user_id=$1 AND u.status='active' AND NOT EXISTS (SELECT 1 FROM user_roles ur JOIN roles rl ON rl.id=ur.role_id WHERE ur.user_id=u.id AND rl.name='admin')`, [userId], tx))[0]
+    if (!eligible) throw new ApiError(409, 'not_eligible', 'Conta desativada ou não disponível.')
     const recharge = await getRecharge(userId,tx)
-    if(!recharge.canReceive) throw new ApiError(409,'recharge_required','Recarga de pedidos vencida.')
     // A administração só confirma por WhatsApp depois de receber o aceite explícito.
     if (!interest && confirmedViaWhatsApp) await query('INSERT INTO service_request_interests (request_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [id,userId], tx)
     await query('UPDATE service_request_interests SET selected_at=$3, recharge_cycle_id=$4 WHERE request_id=$1 AND user_id=$2', [id,userId,now(),recharge.active?recharge.cycleId:null], tx)
@@ -201,5 +207,32 @@ export async function markDelivered(adminId:string,id:string,userId:string) {
   const [r]=await query<Row>(`UPDATE service_request_interests i SET contact_delivered_at=COALESCE(i.contact_delivered_at,now()) FROM service_requests r WHERE i.request_id=r.id AND r.id=$1 AND i.user_id=$2 AND i.selected_at IS NOT NULL AND r.consent RETURNING i.request_id`,[id,userId])
   if(!r) throw new ApiError(409,'not_selected','Selecione o profissional e confirme a autorização antes do repasse.')
   await audit('admin.request_contact_delivered',{userId:adminId,details:{id,professionalId:userId}})
+  return requestDetail(id)
+}
+
+export async function setRouting(adminId: string, id: string, body: Record<string, unknown>) {
+  const mode = body.mode
+  if (mode !== 'manual' && mode !== 'automatic') throw bad('invalid_mode', 'Escolha o modo de distribuição.')
+  const rows = await query<Row>("UPDATE service_requests SET routing_mode=$2 WHERE id=$1 AND status <> 'closed' RETURNING id", [id,mode])
+  if (!rows.length) throw new ApiError(409,'not_open','Pedido encerrado ou inexistente.')
+  await audit('admin.request_routing',{userId:adminId,details:{id,mode}})
+  return requestDetail(id)
+}
+
+export async function inviteProfessional(adminId: string, id: string, userId: string, body: Record<string, unknown>) {
+  await withTransaction(async tx => {
+    const r = (await query<Row>("SELECT status,consent FROM service_requests WHERE id=$1 FOR UPDATE",[id],tx))[0]
+    if (!r || r.status !== 'published' || !r.consent) throw new ApiError(409,'not_open','Pedido não está publicado ou autorizado.')
+    if (body.invite === false) {
+      const selected = (await query<Row>('SELECT selected_at FROM service_request_interests WHERE request_id=$1 AND user_id=$2',[id,userId],tx))[0]
+      if (selected?.selected_at) throw new ApiError(409,'already_selected','Profissional já selecionado.')
+      await query('DELETE FROM service_request_invites WHERE request_id=$1 AND user_id=$2',[id,userId],tx)
+    } else if (body.invite === true) {
+      const eligible = (await query<Row>(`SELECT 1 FROM professional_profiles p JOIN users u ON u.id=p.user_id WHERE p.user_id=$1 AND u.status='active' AND NOT EXISTS (SELECT 1 FROM user_roles ur JOIN roles rl ON rl.id=ur.role_id WHERE ur.user_id=u.id AND rl.name='admin')`,[userId],tx))[0]
+      if (!eligible) throw new ApiError(409,'not_eligible','Conta desativada ou não disponível.')
+      await query('INSERT INTO service_request_invites(request_id,user_id,invited_by) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',[id,userId,adminId],tx)
+    } else throw bad('invalid_invite','Escolha liberar ou retirar.')
+  })
+  await audit('admin.request_invite',{userId:adminId,details:{id,professionalId:userId,invite:body.invite}})
   return requestDetail(id)
 }

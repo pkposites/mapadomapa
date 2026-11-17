@@ -10,7 +10,7 @@ import Spinner from '../../components/ui/Spinner'
 import { SITE } from '../../config/site'
 import { api, ApiError } from '../../lib/api'
 
-type Opp = { id: string; title: string; description: string; profession: string; region: string; neighborhood: string; urgency: string; urgencyLabel: string; periodNote: string | null; publishedAt: string; interested: boolean }
+type Opp = { id: string; title: string; description: string; profession: string; region: string; neighborhood: string; urgency: string; urgencyLabel: string; periodNote: string | null; publishedAt: string; interested: boolean; invited?: boolean }
 const URG_CLS: Record<string, string> = { urgent: 'bg-[#fef3f2] text-[#7a271a]', this_week: 'bg-[#fff6dd] text-[#7a5a00]', flexible: 'bg-ice text-graphite' }
 
 /** Oportunidades reais (cadastradas pela equipe) para quem é aprovado e compatível; senão, a comunicação do lançamento. */
@@ -56,13 +56,13 @@ export default function Pedidos() {
       {data && items.length > 0 && (
         <section className="mt-4" aria-label="Oportunidades" data-testid="opportunities">
           {!master && pending > 0 && <div className="mb-4 flex items-center gap-3 rounded-2xl bg-lime p-4 text-graphite"><Bell size={24} className="shrink-0" aria-hidden="true" /><div><p className="text-[19px] font-bold">{pending} {pending === 1 ? 'pedido aguardando sua resposta' : 'pedidos aguardando sua resposta'}</p><p className="text-[13px]">Confira as oportunidades e responda assim que puder.</p></div></div>}
-          <p className="text-[15px] leading-snug text-muted">{master?'Visão mestre de todos os pedidos publicados. Gerencie cada solicitação no painel.':'Pedidos reais compatíveis com a sua profissão e região. Toque em “Tenho interesse” e a equipe fará a conexão com o cliente.'}</p>
+          <p className="text-[15px] leading-snug text-muted">{master?'Visão mestre de todos os pedidos publicados. Gerencie cada solicitação no painel.':'Pedidos reais encaminhados pela equipe. Toque em “Tenho interesse” e a equipe fará a conexão com o cliente.'}</p>
           {msg && <div className="mt-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
           <ul className="mt-4 space-y-3">
             {items.map((o) => (
               <li key={o.id} id={`pedido-${o.id}`} className={`scroll-mt-20 rounded-3xl bg-white p-5 ${!o.interested ? 'border-2 border-graphite' : 'border border-line'}`} data-testid="opportunity">
                 <div className="flex flex-wrap items-center gap-2">
-                  {!master && !o.interested && <span className="rounded-full bg-lime px-3 py-1 text-[12px] font-bold text-graphite">AGUARDANDO RESPOSTA</span>}
+                  {!master && !o.interested && <span className="rounded-full bg-lime px-3 py-1 text-[12px] font-bold text-graphite">{o.invited?'NOVO CONVITE · RESPONDA':'AGUARDANDO RESPOSTA'}</span>}
                   <span className="rounded-full bg-graphite px-3 py-1 text-[12px] font-semibold text-white">{o.profession}</span>
                   <span className={`rounded-full px-3 py-1 text-[12px] font-semibold ${URG_CLS[o.urgency] ?? 'bg-ice'}`}>{o.urgencyLabel}</span>
                 </div>
