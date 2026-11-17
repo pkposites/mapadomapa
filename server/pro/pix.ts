@@ -3,14 +3,14 @@ import { query, withTransaction } from '../lib/db'
 import { env, isSimulationEnvironment } from '../lib/env'
 import { ApiError } from '../lib/http'
 import { enforce } from '../lib/rateLimit'
-import { getRecharge, getSettings, pixConfigured, adminRecharge } from '../admin/recharges'
+import { getRecharge, pixConfigured, adminRecharge } from '../admin/recharges'
 import { WEEKLY_PRICE, WEEKLY_DAYS } from '../../src/area/rechargePlan'
 
 type Row = Record<string, any>
 const token = () => env('MERCADO_PAGO_ACCESS_TOKEN')
 const webhookSecret = () => env('MERCADO_PAGO_WEBHOOK_SECRET')
 const production = () => env('APP_ENV') !== 'staging' && !isSimulationEnvironment()
-const newPaymentsEnabled = async () => pixConfigured() && env('MERCADO_PAGO_PIX_ENABLED') !== 'false' && (await getSettings()).pixEnabled
+
 const gatewayError = () => new ApiError(503,'payment_unavailable','Não foi possível consultar o Mercado Pago agora. Tente novamente.')
 const isUuid = (v:unknown) => typeof v==='string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v)
 const latest = async(userId:string) => (await query<Row>('SELECT * FROM request_recharge_payments WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1',[userId]))[0]
@@ -105,7 +105,7 @@ export async function checkoutState(userId:string,master:boolean,verify=false) {
   let p=await latest(userId)
   if(verify&&pending(p)){await enforce('pix:verify:'+userId,180,3600);p=await refresh(p)??p}
   const recharge=await getRecharge(userId)
-  return {available:(await newPaymentsEnabled())&&recharge.enabled&&!recharge.paused,active:recharge.active,eligible:await eligible(userId),expiresAt:recharge.expiresAt,payment:publicPayment(p)}
+  return {available:recharge.checkoutEnabled,active:recharge.active,eligible:await eligible(userId),expiresAt:recharge.expiresAt,payment:publicPayment(p)}
 }
 function validCpf(cpf:string) {
   if(!/^\d{11}$/.test(cpf)||/^(\d)\1+$/.test(cpf))return false
@@ -113,7 +113,9 @@ function validCpf(cpf:string) {
   return digit(9)===Number(cpf[9])&&digit(10)===Number(cpf[10])
 }
 export async function createPix(userId:string,master:boolean,body:Record<string,unknown>) {
-  if(master||!pixConfigured()||env('MERCADO_PAGO_PIX_ENABLED')==='false'||!(await newPaymentsEnabled())||!(await getSettings()).enabled)throw new ApiError(409,'not_available','A contratação ainda não está disponível.')
+  if(master||!pixConfigured()||env('MERCADO_PAGO_PIX_ENABLED')==='false')throw new ApiError(409,'not_available','A contratação ainda não está disponível.')
+  const initial=await getRecharge(userId)
+  if(!initial.checkoutEnabled)throw new ApiError(409,'not_available','A contratação não está disponível para este profissional.')
   if(!(await eligible(userId)))throw new ApiError(403,'not_approved','Aprove seu cadastro antes de contratar.')
   await enforce('pix:create:'+userId,8,3600)
   // Quando há um Pix pendente, devolver o mesmo, não criar outro.
@@ -129,7 +131,7 @@ export async function createPix(userId:string,master:boolean,body:Record<string,
   const attempt=await withTransaction(async tx=>{
     await query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[userId],tx)
     const r=await getRecharge(userId,tx)
-    if(!r.enabled||r.active||r.paused||!r.approved||!(await getSettings(tx)).pixEnabled)throw new ApiError(409,'already_active','Já existe uma recarga ativa ou a contratação foi pausada.')
+    if(!r.checkoutEnabled||r.active)throw new ApiError(409,'already_active','Já existe uma recarga ativa ou a contratação foi pausada.')
     const [existing]=await query<Row>("SELECT * FROM request_recharge_payments WHERE user_id=$1 AND status IN ('creating','pending') LIMIT 1",[userId],tx)
     if(existing)return existing
     const [created]=await query<Row>("INSERT INTO request_recharge_payments(id,user_id,expires_at) VALUES ($1,$2,now()+interval '1 hour') RETURNING *",[randomUUID(),userId],tx)

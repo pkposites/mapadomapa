@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { CalendarDays, ChevronRight, ShieldCheck } from 'lucide-react'
 import { WEEKLY_PRICE_LABEL } from './rechargePlan'
-export type Recharge={enabled:boolean;active:boolean;canReceive:boolean;paused?:boolean;approved?:boolean;cycleId:string|null;startsAt:string|null;expiresAt:string|null;delivered:number;target:number}
+export type Recharge={enabled:boolean;billingMode?:'inherit'|'required'|'free';globalEnabled?:boolean;checkoutEnabled?:boolean;pixConfigured?:boolean;active:boolean;canReceive:boolean;paused?:boolean;approved?:boolean;cycleId:string|null;startsAt:string|null;expiresAt:string|null;delivered:number;target:number}
 export const dateLabel=(v:string|null)=>v?new Date(v).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'—'
 export default function RechargeCard({r,master=false}:{r?:Recharge|null;master?:boolean}) {
   return <section className="rounded-2xl border border-line bg-white p-4" aria-label="Recarga semanal">
