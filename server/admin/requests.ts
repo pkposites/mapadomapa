@@ -1,3 +1,4 @@
+import { queueEmail,appLink } from '../lib/email'
 import { accessPredicate, getRecharge } from './recharges'
 import { audit } from '../lib/audit'
 import { now } from '../lib/clock'
@@ -243,6 +244,7 @@ export async function inviteProfessional(adminId: string, id: string, userId: st
       await query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[userId],tx)
       if(!(await getRecharge(userId,tx)).canReceive) throw new ApiError(409,'access_blocked','Profissional sem acesso a novos pedidos. Aprove, retome ou libere a recarga na ficha.')
       await query('INSERT INTO service_request_invites(request_id,user_id,invited_by) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',[id,userId,adminId],tx)
+      await queueEmail(userId,'request-'+id,'Nova oportunidade · Mapa do Mapa','Você tem uma nova oportunidade. Confira seus pedidos no aplicativo: '+appLink+'/pedidos',tx)
     } else throw bad('invalid_invite','Escolha liberar ou retirar.')
   })
   await audit('admin.request_invite',{userId:adminId,details:{id,professionalId:userId,invite:body.invite}})

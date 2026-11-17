@@ -8,6 +8,7 @@ export type Item = {
   professions: string[]; regions: string[]; bestScore: number | null; flagged: number
 }
 export type Detail = {
+  email?:string|null;emailVerified?:boolean;
   whatsappPhone: string; lastWhatsApp: string | null; phoneVerifiedAt: string | null
   fullName: string | null; bio: string | null; services: string | null; extraInfo: string | null; hasPhoto: boolean; unreadMessages: number; welcomeSent: boolean
   profileEvents: { kind: string; details: string | null; at: string }[]

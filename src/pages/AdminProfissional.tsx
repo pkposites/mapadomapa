@@ -122,6 +122,7 @@ function Page() {
       </Block>
 
       <Block title="Contato (app e WhatsApp)">
+        <div className="mb-3 rounded-xl border border-line p-3"><p className="text-[13px] font-semibold">E-mail do profissional</p><p className="break-all">{d.email??'Ainda não cadastrado'}</p><p className="text-[13px] text-muted">{d.emailVerified?'Confirmado':d.email?'Aguardando confirmação':'Cadastro obrigatório no próximo acesso'}</p></div>
         <ContactBox id={d.id} fullName={d.fullName} whatsappPhone={d.whatsappPhone} lastWhatsApp={d.lastWhatsApp} onSent={() => { setRk((n) => n + 1); void load() }} defaultTemplate={d.phoneVerified ? 'welcome' : 'verify'} />
       </Block>
 

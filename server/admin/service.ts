@@ -8,6 +8,7 @@ import { formatNational } from '../lib/phone'
 import { OPTIONS } from '../pro/service'
 import { ALL_QUESTIONS, QUESTIONNAIRES } from '../pro/questions'
 import { postMessage, thread } from '../pro/area'
+import { queueEmail, appLink } from '../lib/email'
 import { announcementPayload, DECISION_PAYLOAD, MSG_PAYLOAD, notify } from '../lib/push'
 
 type Row = Record<string, any>
@@ -64,7 +65,7 @@ export async function list(params: { status?: unknown; q?: unknown; page?: unkno
 /** Dados completos de UM profissional, incluindo respostas do questionário já "traduzidas" em texto. */
 export async function detail(adminId: string, userId: string, ip?: string) {
   const u = (await query<Row>(
-    `SELECT u.id, u.status, u.created_at, u.last_login_at, ph.e164, ph.verified_at, ph.verified_by
+    `SELECT u.id, u.status, u.created_at, u.last_login_at,u.email,u.email_verified_at, ph.e164, ph.verified_at, ph.verified_by
      FROM users u JOIN phones ph ON ph.user_id = u.id AND ph.is_primary WHERE u.id = $1`, [userId]))[0]
   if (!u) throw new ApiError(404, 'not_found', 'Profissional não encontrado.')
   const pr = (await query<Row>('SELECT * FROM professional_profiles WHERE user_id = $1', [userId]))[0]
@@ -96,7 +97,7 @@ export async function detail(adminId: string, userId: string, ip?: string) {
     id: u.id as string, fullName: (pr?.full_name ?? null) as string | null, bio: (pr?.bio ?? null) as string | null, services: (pr?.services ?? null) as string | null,
     extraInfo: (pr?.extra_info ?? null) as string | null, hasPhoto, unreadMessages: unread, welcomeSent: (await query('SELECT 1 FROM messages WHERE user_id = $1 AND kind = \'welcome\'', [userId])).length > 0,
     profileEvents: pevents.map((e) => ({ kind: e.kind as string, details: e.details as string | null, at: e.created_at })),
-    phone: formatNational(u.e164), whatsappPhone: String(u.e164).replace(/\D/g, ''), lastWhatsApp: (lastWa?.created_at ?? null) as string | null, phoneVerified: Boolean(u.verified_at), phoneVerifiedAt: u.verified_at,
+    email:u.email??null,emailVerified:Boolean(u.email_verified_at),phone: formatNational(u.e164), whatsappPhone: String(u.e164).replace(/\D/g, ''), lastWhatsApp: (lastWa?.created_at ?? null) as string | null, phoneVerified: Boolean(u.verified_at), phoneVerifiedAt: u.verified_at,
     accountStatus: u.status as string, createdAt: u.created_at, lastLoginAt: u.last_login_at,
     reviewStatus: (pr?.review_status ?? 'not_submitted') as string, submittedAt: pr?.submitted_at ?? null, reviewNotes: pr?.review_notes ?? null, reviewedAt: pr?.reviewed_at ?? null,
     work: pr ? { availability: pr.availability, ownTools: opt(OPTIONS.ownTools, pr.own_tools), vehicle: opt(OPTIONS.vehicle, pr.vehicle), workStructure: opt(OPTIONS.workStructure, pr.work_structure) } : null,
@@ -162,6 +163,7 @@ export async function decide(adminId: string, userId: string, body: Record<strin
     const msg = ({ approve: 'Seu cadastro foi aprovado!', reinstate: 'Seu cadastro foi reativado.', reject: 'Seu cadastro não foi aprovado.',
       request_changes: 'Precisamos de ajustes no seu cadastro.', suspend: 'Seu cadastro foi suspenso.' } as Record<string, string>)[action]
     await c.query(`INSERT INTO messages (user_id, sender, sender_user_id, kind, body) VALUES ($1,'admin',$2,'decision',$3)`, [userId, adminId, (msg + (notes ? ` Motivo/orientação: ${notes}` : '')).slice(0, 1000)])
+    if(t.to==='approved')await queueEmail(userId,'approved','Seu cadastro foi aprovado!','Você já pode acompanhar as oportunidades do Mapa do Mapa. Entre em '+appLink,c)
     return { from, to: t.to }
   })
   await audit('admin.decision', { userId: adminId, ip, details: { target: userId, action, ...result } })

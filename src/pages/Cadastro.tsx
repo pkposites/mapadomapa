@@ -17,11 +17,12 @@ import { SITE } from '../config/site'
 import { readConsent } from '../lib/consent'
 import { readMetaCookies, trackBrowserEvent } from '../lib/meta'
 
-type Errors = Partial<Record<'phone' | 'password' | 'terms' | 'code' | 'captcha' | 'form', string>>
+type Errors = Partial<Record<'phone' | 'email' | 'password' | 'terms' | 'code' | 'captcha' | 'form', string>>
 type Registered = { phone: string; resendIn: number; expiresIn: number }
 
 const FIELD_OF: Record<string, keyof Errors> = {
   invalid_phone: 'phone',
+  invalid_email:'email',email_taken:'email',
   weak_password: 'password',
   terms_required: 'terms',
   code_invalid: 'code',
@@ -39,6 +40,7 @@ export default function Cadastro() {
 
   // Vindo do login com celular ainda não confirmado: já abre na etapa do código.
   const [phone, setPhone] = useState(state.verifyPhone ?? '')
+  const [email,setEmail]=useState('')
   const [password, setPassword] = useState('')
   const [accepted, setAccepted] = useState(false)
   const [code, setCode] = useState('')
@@ -75,6 +77,7 @@ export default function Cadastro() {
     ev.preventDefault()
     const next: Errors = {}
     if (!isPhoneComplete(phone)) next.phone = 'Digite o celular com DDD. Exemplo: (11) 91234-5678.'
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))next.email='Informe um e-mail válido.'
     if (password.length < 8) next.password = 'Use pelo menos 8 caracteres na senha.'
     if (!accepted) next.terms = 'Marque que você leu e aceita para continuar.'
     if (captchaMode && !captcha) next.captcha = captchaMode === 'pow' ? 'Verificando a segurança… aguarde um instante e toque em Continuar de novo.' : CAPTCHA_MSG
@@ -82,10 +85,10 @@ export default function Cadastro() {
     if (Object.keys(next).length) return
     setBusy(true)
     try {
-      const r = await api.post<Registered | { ok: true; mode: 'admin' }>('/auth/register', { phone, password, acceptTerms: true, captchaToken: captcha, contato_extra: hp })
+      const r = await api.post<Registered | { ok: true; mode: 'admin' }>('/auth/register', { phone, email, password, acceptTerms: true, captchaToken: captcha, contato_extra: hp })
       if ('mode' in r) { // MVP: conta criada e já logada; o celular será verificado pela equipe
         await refresh()
-        navigate('/profissional', { replace: true })
+        navigate('/area/email', { replace: true, state:{from:'/profissional'} })
         return
       }
       startCooldown(r.resendIn)
@@ -191,8 +194,8 @@ export default function Cadastro() {
       eyebrow="Pré-cadastro gratuito"
       title="Crie sua conta"
       subtitle={vmode === 'admin'
-        ? <>Só precisamos do seu celular e de uma senha. Sua conta é criada na hora, o celular é verificado depois pela nossa equipe e seu perfil fica em análise até a aprovação. Os pedidos de orçamento estão previstos a partir de {SITE.requestsOpenLabel}.</>
-        : <>Só precisamos do seu celular e de uma senha. Não pedimos e-mail. Os pedidos de orçamento estão previstos a partir de {SITE.requestsOpenLabel}.</>}
+        ? <>Precisamos do seu celular, e-mail e uma senha. Sua conta é criada na hora, o celular é verificado depois pela nossa equipe e seu perfil fica em análise até a aprovação. Os pedidos de orçamento estão previstos a partir de {SITE.requestsOpenLabel}.</>
+        : <>Precisamos do seu celular, e-mail e uma senha. Os pedidos de orçamento estão previstos a partir de {SITE.requestsOpenLabel}.</>}
       below={<>Já tem conta? <Link to="/entrar" className={standaloneLink}>Entrar</Link></>}
     >
       <form onSubmit={submitForm} noValidate className="space-y-5">
@@ -211,6 +214,7 @@ export default function Cadastro() {
           </Alert>
         )}
         <PhoneField id="phone" label="Seu celular" hint={vmode === 'admin' ? 'Usamos para a equipe falar com você.' : 'Vamos enviar um código por SMS para confirmar.'} value={phone} onChange={setPhone} error={errors.phone} autoFocus />
+        <div><label htmlFor="email" className="block text-[15px] font-semibold">Seu e-mail *</label><input id="email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required maxLength={254} className="mt-2 block w-full rounded-2xl border border-line px-4 py-3 text-[16px]" placeholder="nome@email.com"/><p className="mt-1 text-[13px] text-muted">Para avisos, pagamentos e segurança da conta.</p>{errors.email&&<p role="alert" className="mt-1 text-[13px] text-red-700">{errors.email}</p>}</div>
         <PasswordField id="password" label="Crie uma senha" hint="Pelo menos 8 caracteres." value={password} onChange={setPassword} error={errors.password} autoComplete="new-password" />
 
         <div>

@@ -92,6 +92,7 @@ export default function Perfil() {
           <p className={`${label} mt-4`}>Celular</p>
           <p className="mt-1 text-[16px]" data-testid="my-phone">{phone?.phone} <span className="ml-2 rounded-full bg-ice px-2.5 py-1 text-[13px] text-muted">{phone?.verified ? 'verificado' : 'não verificado'}</span></p>
           <p className="mt-1 text-[13px] leading-snug text-muted">O celular só pode ser alterado pela equipe. {user?.isAdmin||phone?.verified ? '' : 'A verificação é feita manualmente pela equipe durante a análise do cadastro; se tiver dúvidas, escreva em Mensagens.'}</p>
+          <p className={label+' mt-4'}>E-mail</p><p className="mt-1 break-all text-[16px]">{user?.email??'Não cadastrado'}</p><p className="text-[13px] text-muted">{user?.emailVerified?'Confirmado':'Não confirmado'}</p><Link to="/area/email" className="mt-1 inline-block text-[14px] font-semibold underline">Alterar ou confirmar e-mail</Link>
           <label htmlFor="bio" className={`${label} mt-4`}>Apresentação profissional</label>
           <textarea id="bio" rows={4} maxLength={600} value={f.bio} onChange={(e) => setF({ ...f, bio: e.target.value })} className={field} disabled={blocked} placeholder="Conte quem você é e como trabalha." />
           <label htmlFor="services" className={`${label} mt-4`}>Serviços que você realiza</label>

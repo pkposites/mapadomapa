@@ -13,7 +13,7 @@ beforeEach(async () => {
 })
 
 const register = (over: Record<string, unknown> = {}, ip?: string) =>
-  api('POST', '/auth/register', { body: { phone: PHONE, password: PASSWORD, acceptTerms: true, ...over }, ip })
+  api('POST', '/auth/register', { body: { phone: PHONE, email: (String(over.phone??PHONE).replace(/\D/g,'')||'test')+'@example.test', password: PASSWORD, acceptTerms: true, ...over }, ip })
 
 describe('1. Criação de conta', () => {
   it('cria conta pendente, envia SMS simulado e guarda só o hash da senha', async () => {
@@ -27,7 +27,7 @@ describe('1. Criação de conta', () => {
     expect(u.password_hash).toMatch(/^scrypt\$/)
     expect(u.password_hash).not.toContain(PASSWORD)
     expect(u.terms_accepted_at).toBeTruthy()
-    // perfil e papel "user" criados junto; nenhum e-mail é pedido
+    // perfil e papel "user" criados junto; e-mail cadastrado junto
     expect((await query('SELECT 1 FROM profiles')).length).toBe(1)
     expect((await query("SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE r.name='user'")).length).toBe(1)
   })

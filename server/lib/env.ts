@@ -78,7 +78,7 @@ export function isLocalDatabaseUrl(url: string): boolean {
 // A proteção real contra gasto com IA é outra, e continua valendo:
 //   - em homologação aiMode() devolve SEMPRE 'sim' (nunca lê nem usa a chave);
 //   - fora dela, a OpenAI só é chamada com AI_PROVIDER=openai explícito (também proibido aqui).
-const FORBIDDEN_IN_STAGING = ['META_CAPI_ACCESS_TOKEN', 'TURNSTILE_SECRET_KEY'] as const
+const FORBIDDEN_IN_STAGING = ['META_CAPI_ACCESS_TOKEN', 'TURNSTILE_SECRET_KEY', 'RESEND_API_KEY'] as const
 
 export type StagingCheck = { ok: true } | { ok: false; reason: string }
 export function checkStaging(requestHost: string | null | undefined): StagingCheck {

@@ -1,9 +1,11 @@
 import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Landing from './pages/Landing'
+import RecuperarEmail from './pages/RecuperarEmail'
 import Entrar from './pages/Entrar'
 import NotFound from './pages/NotFound'
 import Inicio from './pages/area/Inicio'
+import Email from './pages/area/Email'
 import Perfil from './pages/area/Perfil'
 import MuralPage from './pages/area/MuralPage'
 import PostPage from './pages/area/PostPage'
@@ -56,12 +58,14 @@ export default function App() {
         <Route path={SITE.signupPath} element={<Cadastro />} />
         <Route path={SITE.privacyPath} element={<Privacidade />} />
         <Route path={SITE.termsPath} element={<Termos />} />
+        <Route path="/recuperar-senha" element={<RecuperarEmail />} />
         <Route path="/entrar" element={<Entrar />} />
         <Route path="/conta" element={<Navigate to="/area" replace />} />
         <Route path="/area" element={<RequireAuth><Inicio /></RequireAuth>} />
         <Route path="/area/destaque" element={<RequireAuth><Destaque /></RequireAuth>} />
         <Route path="/area/mural/:id" element={<RequireAuth><PostPage /></RequireAuth>} />
         <Route path="/area/mural" element={<RequireAuth><MuralPage /></RequireAuth>} />
+        <Route path="/area/email" element={<RequireAuth><Email /></RequireAuth>} />
         <Route path="/area/perfil" element={<RequireAuth><Perfil /></RequireAuth>} />
         <Route path="/area/mensagens" element={<RequireAuth><Mensagens /></RequireAuth>} />
         <Route path="/area/recarga" element={<RequireAuth><Recarga /></RequireAuth>} />

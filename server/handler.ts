@@ -22,6 +22,7 @@ import * as intake from './admin/deforafora'
 import * as preq from './pro/requests'
 import * as adm from './admin/service'
 import * as auth from './services/auth'
+import * as email from './services/email'
 
 function photoResponse(p: { type: string; data: Buffer } | null): Response {
   if (!p) return json({ error: { code: 'not_found', message: 'Sem foto.' } }, 404)
@@ -122,6 +123,8 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
   if (method === 'POST' && path === '/auth/forgot-password') return json(await auth.forgotPassword(await readJson(req), ctx))
   if (method === 'POST' && path === '/auth/reset-password') return json(await auth.resetPassword(await readJson(req), ctx))
 
+  if(method==='POST'&&path==='/auth/email/forgot')return json(await email.requestEmailPasswordReset(await readJson(req),ctx.ip))
+  if(method==='POST'&&path==='/auth/email/reset')return json(await email.resetByEmail(await readJson(req),ctx.ip))
   // ---------- Área privada ----------
   if (method === 'GET' && path === '/auth/me') {
     const user = await loadSession(token)
@@ -132,9 +135,17 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     return json(auth.meBody(user))
   }
 
+  if(path==='/auth/email'||path==='/auth/email/send'||path==='/auth/email/verify'){
+    const me=requireUser(await loadSession(token))
+    if(method==='GET'&&path==='/auth/email')return json(await email.emailState(me.userId))
+    if(method==='PUT'&&path==='/auth/email')return json(await email.saveEmail(me.userId,await readJson(req)))
+    if(method==='POST'&&path==='/auth/email/send')return json(await email.requestEmailCode(me.userId))
+    if(method==='POST'&&path==='/auth/email/verify')return json(await email.confirmEmail(me.userId,await readJson(req)))
+  }
   // ---------- Cadastro profissional (Etapa 3): exige login ----------
   if (path.startsWith('/pro/')) {
     const me = requireUser(await loadSession(token))
+    if(!me.email&&!me.roles.includes('admin'))throw new ApiError(403,'email_required','Cadastre seu e-mail para continuar.')
     if (method==='GET' && path==='/pro/recharge/pix') return json(await pix.checkoutState(me.userId,me.roles.includes('admin'),url.searchParams.get('verify')==='1'))
     if (method==='POST' && path==='/pro/recharge/pix') return json(await pix.createPix(me.userId,me.roles.includes('admin'),await readJson(req)))
     if (method === 'GET' && path === '/pro/catalog') return json(await pro.getCatalog())

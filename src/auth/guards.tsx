@@ -9,5 +9,6 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation()
   if (loading) return <Spinner fullPage />
   if (!user) return <Navigate to="/entrar" replace state={{ from: location.pathname }} />
+  if(!user.isAdmin&&!user.email&&location.pathname!=='/area/email')return <Navigate to="/area/email" replace state={{from:location.pathname}} />
   return <>{children}</>
 }

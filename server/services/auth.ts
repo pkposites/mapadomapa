@@ -11,6 +11,7 @@ import { enforce, hit, peek, reset, tooMany } from '../lib/rateLimit'
 import { createSession, revokeAllSessions, type SessionUser } from '../lib/sessions'
 import { getSmsProvider } from '../sms'
 import { randomUUID } from 'node:crypto'
+import { emailOrThrow, emailTaken } from './email'
 import { EVENT_COMPLETE_REGISTRATION, trackServerEvent } from '../lib/meta'
 
 /** optOut = o navegador enviou Sec-GPC/DNT: nunca rastrear. origin = endereço público do site. */
@@ -45,13 +46,13 @@ const findByPhone = async (e164: string): Promise<PhoneUser | undefined> =>
  * MVP (sem SMS/WhatsApp): a conta já nasce ATIVA e logada, com o celular NÃO VERIFICADO.
  * Só um administrador marca o celular como verificado.
  */
-async function registerWithoutSms(phone: string, password: string, bootstrap: boolean, ctx: Ctx) {
+async function registerWithoutSms(phone: string, password: string, email: string, bootstrap: boolean, ctx: Ctx) {
   if (await findByPhone(phone)) throw phoneTaken()
   const hash = await hashPassword(password)
   let userId: string
   try {
     userId = await withTransaction(async (c) => {
-      const u = await c.query<{ id: string }>("INSERT INTO users (status, password_hash, terms_accepted_at) VALUES ('active', $1, $2) RETURNING id", [hash, now()])
+      const u = await c.query<{ id: string }>("INSERT INTO users (status, password_hash, terms_accepted_at,email) VALUES ('active', $1, $2,$3) RETURNING id", [hash, now(),email])
       const id = u.rows[0].id
       await c.query('INSERT INTO phones (user_id, e164) VALUES ($1, $2)', [id, phone]) // verified_at fica NULO
       await c.query('INSERT INTO profiles (user_id) VALUES ($1)', [id])
@@ -64,7 +65,7 @@ async function registerWithoutSms(phone: string, password: string, bootstrap: bo
       return id
     })
   } catch (e) {
-    if (isUniqueViolation(e)) throw phoneTaken()
+    if (isUniqueViolation(e)) { if((e as {constraint?:string}).constraint==='users_email_unique')throw emailTaken();throw phoneTaken() }
     throw e
   }
   const session = await createSession(userId, ctx)
@@ -76,6 +77,7 @@ async function registerWithoutSms(phone: string, password: string, bootstrap: bo
 export async function register(body: Body, ctx: Ctx) {
   const phone = phoneOrThrow(body.phone)
   const password = passwordOrThrow(body.password)
+  const email=emailOrThrow(body.email)
   if (body.acceptTerms !== true) {
     throw new ApiError(400, 'terms_required', 'Para continuar, marque que você leu e aceita os Termos de Uso e a Política de Privacidade.')
   }
@@ -89,7 +91,7 @@ export async function register(body: Body, ctx: Ctx) {
   }
   await enforce(`register:ip:${ctx.ip ?? 'unknown'}`, POLICY.registerPerIp.limit, POLICY.registerPerIp.windowSeconds)
   await verifyCaptcha(body.captchaToken, ctx.ip)
-  if (verificationMode() === 'admin') return registerWithoutSms(phone, password, bootstrap, ctx)
+  if (verificationMode() === 'admin') return registerWithoutSms(phone, password, email, bootstrap, ctx)
 
   const existing = await findByPhone(phone)
   if (existing?.verified_at) throw phoneTaken()
@@ -100,12 +102,12 @@ export async function register(body: Body, ctx: Ctx) {
     await withTransaction(async (c) => {
       if (existing) {
         // Cadastro abandonado (celular nunca confirmado): permite retomar com a senha nova.
-        await c.query('UPDATE users SET password_hash = $2, terms_accepted_at = $3, updated_at = $3 WHERE id = $1', [existing.user_id, passwordHash, t])
+        await c.query('UPDATE users SET password_hash = $2, terms_accepted_at = $3, updated_at = $3,email=$4,email_verified_at=NULL WHERE id = $1', [existing.user_id, passwordHash, t,email])
         return
       }
       const u = await c.query<{ id: string }>(
-        'INSERT INTO users (password_hash, terms_accepted_at) VALUES ($1, $2) RETURNING id',
-        [passwordHash, t],
+        'INSERT INTO users (password_hash, terms_accepted_at,email) VALUES ($1, $2,$3) RETURNING id',
+        [passwordHash, t,email],
       )
       const id = u.rows[0].id
       await c.query('INSERT INTO phones (user_id, e164) VALUES ($1, $2)', [id, phone])
@@ -113,7 +115,7 @@ export async function register(body: Body, ctx: Ctx) {
       await c.query("INSERT INTO user_roles (user_id, role_id) SELECT $1, id FROM roles WHERE name = 'user'", [id])
     })
   } catch (err) {
-    if (isUniqueViolation(err)) throw phoneTaken() // outra requisição criou o mesmo número ao mesmo tempo
+    if (isUniqueViolation(err)) { if((err as {constraint?:string}).constraint==='users_email_unique')throw emailTaken();throw phoneTaken() } // outra requisição criou o mesmo número ao mesmo tempo
     throw err
   }
 
@@ -256,6 +258,7 @@ export const meBody = (u: SessionUser) => ({
     phone: formatNational(u.phone),
     phoneMasked: maskPhone(u.phone),
     phoneVerified: u.phoneVerified,
+    email:u.email??null,emailVerified:Boolean(u.emailVerified),
     roles: u.roles,
     isAdmin: u.roles.includes('admin'),
   },

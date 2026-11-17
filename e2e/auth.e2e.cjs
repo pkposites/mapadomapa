@@ -43,7 +43,7 @@ async function overflow(page) { return page.evaluate(() => document.documentElem
   await page.waitForURL('**/cadastro')
   await page.waitForSelector('text=Crie sua conta')
   check('CTA da landing leva ao cadastro real', true)
-  check('não pede e-mail', !(await page.locator('input[type=email]').count()) && !/e-?mail/i.test(await page.locator('label').allInnerTexts().then((a) => a.join(' '))))
+  check('pede e-mail', (await page.locator('input[type=email]').count()) === 1)
   await shot('01-cadastro')
 
   await page.getByRole('button', { name: 'Continuar' }).click()
@@ -52,6 +52,7 @@ async function overflow(page) { return page.evaluate(() => document.documentElem
   await shot('02-cadastro-erros')
 
   await page.getByLabel('Seu celular').fill(phone)
+  await page.locator('input[type=email]').fill(digits(phone)+'@example.test')
   check('máscara do celular aplicada', (await page.getByLabel('Seu celular').inputValue()) === phone)
   await page.getByLabel('Crie uma senha').fill('12345678')
   await page.getByLabel(/Li e aceito/).check()

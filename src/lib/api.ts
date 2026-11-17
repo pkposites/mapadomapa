@@ -39,5 +39,5 @@ export const api = {
 }
 
 export type Me = {
-  user: { id: string; phone: string; phoneMasked: string; phoneVerified: boolean; roles: string[]; isAdmin: boolean }
+  user: { id: string; phone: string; phoneMasked: string; phoneVerified: boolean; email?:string|null; emailVerified?:boolean; roles: string[]; isAdmin: boolean }
 }

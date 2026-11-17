@@ -1,3 +1,4 @@
+import { queueEmail,appLink } from '../lib/email'
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import { query, withTransaction } from '../lib/db'
 import { env, isSimulationEnvironment } from '../lib/env'
@@ -80,6 +81,7 @@ async function syncPayment(mp:Row,expected?:string,expectedId?:string) {
       const [grant]=await query<Row>(`INSERT INTO request_recharge_cycles(user_id,starts_at,expires_at)
         VALUES ($1,GREATEST(now(),COALESCE($2::timestamptz,now())),GREATEST(now(),COALESCE($2::timestamptz,now()))+($3::int * interval '1 day')) RETURNING id`,[p.user_id,active.active?active.expiresAt:null,WEEKLY_DAYS],tx)
       cycle=grant.id
+      await queueEmail(String(p.user_id),'payment-'+ref,'Pagamento Pix confirmado','Sua recarga de R$ 175,00 por 7 dias foi confirmada. Confira os detalhes em '+appLink+'/recarga',tx)
     }
     if(cycle&&['refunded','charged_back'].includes(status))await query('UPDATE request_recharge_cycles SET revoked_at=COALESCE(revoked_at,now()) WHERE id=$1',[cycle],tx)
     const qr=typeof td?.qr_code==='string'&&td.qr_code.length<=10000?td.qr_code:null
