@@ -152,6 +152,7 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if(path==='/pro/app-installed' && method==='POST')return json(await emailControls.markInstalled(me.userId))
     if (method==='GET' && path==='/pro/recharge/pix') return json(await pix.checkoutState(me.userId,me.roles.includes('admin'),url.searchParams.get('verify')==='1'))
     if (method==='POST' && path==='/pro/recharge/pix') return json(await pix.createPix(me.userId,me.roles.includes('admin'),await readJson(req)))
+    if (method === 'GET' && path === '/pro/qualification') return json(await pro.qualificationStatus(me.userId))
     if (method === 'GET' && path === '/pro/catalog') return json(await pro.getCatalog())
     if (method === 'GET' && path === '/pro/profile') return json(await pro.getState(me.userId))
     if (method === 'PUT' && path === '/pro/professions') return json(await pro.setProfessions(me.userId, await readJson(req)))

@@ -58,6 +58,19 @@ async function ensureProfile(userId: string): Promise<Row> {
   return (await query<Row>('SELECT * FROM professional_profiles WHERE user_id = $1', [userId]))[0]
 }
 
+/** Dados de revalidação do próprio profissional; não expõe respostas corretas ou notas internas. */
+export async function qualificationStatus(userId: string) {
+  const rows = await query<Row>(
+    `SELECT p.slug, p.name, a.evaluated_at, a.questionnaire_version
+     FROM profile_professions pp JOIN professions p ON p.id=pp.profession_id
+     LEFT JOIN technical_assessments a ON a.user_id=pp.user_id AND a.profession_id=pp.profession_id
+     WHERE pp.user_id=$1 ORDER BY p.sort_order`, [userId])
+  return { version: QUESTIONNAIRE_VERSION, items: rows.map(r => ({
+    profession: r.name, slug: r.slug, evaluatedAt: r.evaluated_at ?? null,
+    currentVersion: Boolean(r.evaluated_at && r.questionnaire_version===QUESTIONNAIRE_VERSION)
+  })) }
+}
+
 export async function getState(userId: string) {
   const profile = await ensureProfile(userId)
   const pros = await query<Row>(
