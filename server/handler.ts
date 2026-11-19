@@ -150,6 +150,20 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
     if(path==='/pro/email-preferences' && method==='GET')return json(await emailControls.preferences(me.userId))
     if(path==='/pro/email-preferences' && method==='PUT')return json(await emailControls.savePreferences(me.userId,await readJson(req)))
     if(path==='/pro/app-installed' && method==='POST')return json(await emailControls.markInstalled(me.userId))
+    if (path === '/pro/dff-plan-terms' && ['GET','POST'].includes(method)) {
+      const version = "dff-2026-11-19-v1"
+      const terms = ["Prestadora: De Fora a Fora — agência de publicidade e marketing, CNPJ 31.535.502/0001-40.","Investimento: R$ 175,00 por período de 7 dias, destinado à publicidade, captação e direcionamento de oportunidades comerciais. Sem renovação automática.","Expectativa de oportunidades: média estimada de 3 solicitações qualificadas por semana, podendo variar conforme a demanda, região e categoria profissional, inclusive sem recebimento de contatos. Não existe garantia de quantidade mínima.","Resultados: não há garantia de contratação, faturamento, fechamento de serviços ou retorno financeiro.","Reembolso: não haverá reembolso por ausência de resultados, variação na quantidade de solicitações ou desistência após a prestação do serviço, ressalvadas as hipóteses legalmente obrigatórias.","Responsabilidade: o profissional atua de forma independente, sendo responsável por atendimentos, orçamentos, negociações, execução e garantia dos serviços prestados.","Aceite: ao aderir ao programa, o profissional declara compreender e concordar com todas as condições apresentadas."]
+      if (method === 'POST') {
+        const body = await readJson(req)
+        if (body.accept !== true || body.version !== version) throw new ApiError(400,'terms_required','Leia e aceite a versão atual do termo.')
+        const [approved] = await query('SELECT 1 FROM professional_profiles WHERE user_id=$1 AND review_status=$2',[me.userId,'approved'])
+        if (!approved || me.roles.includes('admin')) throw new ApiError(403,'not_approved','Seu cadastro precisa estar aprovado.')
+        await enforce('dff:terms:'+me.userId,10,3600)
+        await query('INSERT INTO audit_log (user_id,event,ip,details) VALUES ($1,$2,$3,$4)',[me.userId,'dff.plan_terms_accepted',ctx.ip??null,JSON.stringify({version,terms})])
+      }
+      const [record] = await query<{created_at:unknown}>("SELECT created_at FROM audit_log WHERE user_id=$1 AND event=$2 AND details->>'version'=$3 ORDER BY created_at DESC LIMIT 1",[me.userId,'dff.plan_terms_accepted',version])
+      return json({version,terms,acceptedAt:record?.created_at??null})
+    }
     if (method==='GET' && path==='/pro/recharge/pix') return json(await pix.checkoutState(me.userId,me.roles.includes('admin'),url.searchParams.get('verify')==='1'))
     if (method==='POST' && path==='/pro/recharge/pix') return json(await pix.createPix(me.userId,me.roles.includes('admin'),await readJson(req)))
     if (method === 'GET' && path === '/pro/qualification') return json(await pro.qualificationStatus(me.userId))
