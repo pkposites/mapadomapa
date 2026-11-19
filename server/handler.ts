@@ -164,6 +164,14 @@ async function route(req: Request, apiCtx: ApiContext): Promise<Response> {
       const [record] = await query<{created_at:unknown}>("SELECT created_at FROM audit_log WHERE user_id=$1 AND event=$2 AND details->>'version'=$3 ORDER BY created_at DESC LIMIT 1",[me.userId,'dff.plan_terms_accepted',version])
       return json({version,terms,acceptedAt:record?.created_at??null})
     }
+    if (method==='POST' && path==='/pro/dff-recharge/pix') {
+      const body=await readJson(req)
+      const [accepted]=await query("SELECT 1 FROM audit_log WHERE user_id=$1 AND event=$2 AND details->>'version'=$3 LIMIT 1",[me.userId,'dff.plan_terms_accepted','dff-2026-11-19-v1'])
+      if(!accepted||body.termsVersion!=='dff-2026-11-19-v1')throw new ApiError(403,'terms_required','Leia e aceite o termo de adesão vigente antes de pagar.')
+      const profile=await area.getMe(me.userId)
+      if(!profile.fullName||body.confirmPersonalData!==true)throw new ApiError(400,'personal_data_required','Confirme seus dados pessoais antes de pagar.')
+      return json(await pix.createPix(me.userId,me.roles.includes('admin'),body))
+    }
     if (method==='GET' && path==='/pro/recharge/pix') return json(await pix.checkoutState(me.userId,me.roles.includes('admin'),url.searchParams.get('verify')==='1'))
     if (method==='POST' && path==='/pro/recharge/pix') return json(await pix.createPix(me.userId,me.roles.includes('admin'),await readJson(req)))
     if (method === 'GET' && path === '/pro/qualification') return json(await pro.qualificationStatus(me.userId))
